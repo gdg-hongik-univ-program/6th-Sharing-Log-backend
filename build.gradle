@@ -34,6 +34,8 @@ dependencies {
     testImplementation 'org.springframework.security:spring-security-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     runtimeOnly 'com.h2database:h2' // 인메모리 데이터베이스
+
+    implementation 'com.mysql:mysql-connector-j' // 아마존 서버에서 mySQL 사용하므로 프로젝트 빌드해 배포하기전 의존성 추가
 }
 
 tasks.named('test') {
