@@ -36,3 +36,55 @@ Google에서 `401 invalid_client`가 뜨면 대부분 아래 중 하나입니다
 - Google Cloud Console에서 만든 OAuth Client가 `웹 애플리케이션` 타입이 아님
 - Client ID/Secret을 복사할 때 앞뒤 공백이나 따옴표가 들어감
 - 삭제했거나 다른 프로젝트의 OAuth Client ID를 사용함
+
+
+## 로그아웃 테스트 방법
+
+### 브라우저 테스트 방법
+
+1. 서버 실행
+```$env:JAVA_HOME='C:\Users\SAMSUNG\.jdks\corretto-26.0.1'
+.\gradlew.bat bootRun
+```
+
+2.브라우저에서 로그인
+```
+http://localhost:8080/login
+```
+
+3. 로그인 완료 후 개발자도구 Console에서 실행
+```
+fetch('/api/auth/logout', {
+method: 'POST',
+credentials: 'include'
+}).then(res => console.log(res.status))
+```
+
+4. 콘솔에 204가 찍히면 성공입니다.
+
+5. 새로고침하거나 /로 가면 로그인되지 않은 상태로 보여야 합니다.
+
+
+### POSTMAN 테스트 방법
+
+1. 브라우저에서 먼저 Google 로그인까지 완료합니다.
+
+2. 개발자도구 → Application → Cookies → http://localhost:8080에서 JSESSIONID 값을 복사합니다.
+
+3. Postman에서 요청 생성:
+```
+POST http://localhost:8080/api/auth/logout
+```
+
+
+4. Headers 또는 Cookies에 추가:
+```
+Cookie: JSESSIONID=복사한값
+```
+
+5. Send 클릭.
+
+6. 응답이 이렇게 오면 성공:204 No Content
+
++)  지금 설정에서는 /api/auth/logout만 CSRF 예외로 빼뒀기 때문에 Postman에서 CSRF 토큰 없이 바로 테스트할 수 있다. 
+    모바일 앱에서도 같은 방식으로 세션 쿠키를 포함해서 POST /api/auth/logout 호출하면 된다.
