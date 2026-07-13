@@ -86,5 +86,8 @@ Cookie: JSESSIONID=복사한값
 
 6. 응답이 이렇게 오면 성공:204 No Content
 
-+)  지금 설정에서는 /api/auth/logout만 CSRF 예외로 빼뒀기 때문에 Postman에서 CSRF 토큰 없이 바로 테스트할 수 있다. 
-    모바일 앱에서도 같은 방식으로 세션 쿠키를 포함해서 POST /api/auth/logout 호출하면 된다.
++)  로그아웃:
+    지금 설정에서는 /api/auth/logout만 CSRF 예외로 빼뒀기 때문에 
+    Postman에서 CSRF 토큰 없이 바로 테스트할 수 있다. 
+    모바일 앱에서도 같은 방식으로 세션 쿠키를 포함해서 
+    POST /api/auth/logout 호출하면 된다.
