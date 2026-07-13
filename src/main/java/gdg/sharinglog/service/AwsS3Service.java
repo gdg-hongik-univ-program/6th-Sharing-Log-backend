@@ -1,3 +1,4 @@
+/*
 package gdg.sharinglog.service;
 
 import lombok.RequiredArgsConstructor;
@@ -45,3 +46,5 @@ public class AwsS3Service implements FileStorageService {
         return new UploadResponse(url);
     }
 }
+
+*/

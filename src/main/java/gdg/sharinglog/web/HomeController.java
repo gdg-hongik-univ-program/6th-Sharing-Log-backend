@@ -32,10 +32,16 @@ public class HomeController {
                                 <p class="eyebrow">Sharing Log</p>
                                 <h1>공동생활을 조금 더 가볍게</h1>
                                 <p class="copy">로그인하면 쉐어하우스 멤버와 공동 업무를 관리할 수 있습니다.</p>
-                                <a class="google-button" href="/oauth2/authorization/google">
-                                    <span class="google-mark" aria-hidden="true">G</span>
-                                    <span>구글로 로그인하기</span>
-                                </a>
+                                <div class="login-buttons">
+                                    <a class="google-button" href="/oauth2/authorization/google">
+                                        <span class="google-mark" aria-hidden="true">G</span>
+                                        <span>구글로 로그인하기</span>
+                                    </a>
+                                    <a class="naver-button" href="/oauth2/authorization/naver">
+                                        <span class="naver-mark" aria-hidden="true">N</span>
+                                        <span>네이버로 로그인하기</span>
+                                    </a>
+                                </div>
                             </section>
                         </main>
                     </body>

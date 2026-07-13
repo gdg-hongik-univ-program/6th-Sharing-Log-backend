@@ -25,11 +25,13 @@ class LoginFlowTest {
     MockMvc mockMvc;
 
     @Test
-    void loginPageShowsGoogleLoginButton() throws Exception {
+    void loginPageShowsOAuth2LoginButtons() throws Exception {
         mockMvc.perform(get("/login"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("구글로 로그인하기")))
-                .andExpect(content().string(containsString("/oauth2/authorization/google")));
+                .andExpect(content().string(containsString("/oauth2/authorization/google")))
+                .andExpect(content().string(containsString("네이버로 로그인하기")))
+                .andExpect(content().string(containsString("/oauth2/authorization/naver")));
     }
 
     @Test
@@ -38,6 +40,14 @@ class LoginFlowTest {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(header().string("Location",
                         startsWith("https://accounts.google.com/o/oauth2/v2/auth?")));
+    }
+
+    @Test
+    void naverAuthorizationEndpointRedirectsToNaver() throws Exception {
+        mockMvc.perform(get("/oauth2/authorization/naver"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(header().string("Location",
+                        startsWith("https://nid.naver.com/oauth2.0/authorize?")));
     }
 
     @Test

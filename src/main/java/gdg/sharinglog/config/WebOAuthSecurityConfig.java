@@ -1,5 +1,6 @@
 package gdg.sharinglog.config;
 
+import gdg.sharinglog.config.oauth.OAuth2UserCustomService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
@@ -8,6 +9,12 @@ import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
 public class WebOAuthSecurityConfig {
+
+    private final OAuth2UserCustomService oAuth2UserCustomService;
+
+    public WebOAuthSecurityConfig(OAuth2UserCustomService oAuth2UserCustomService) {
+        this.oAuth2UserCustomService = oAuth2UserCustomService;
+    }
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -18,6 +25,8 @@ public class WebOAuthSecurityConfig {
                 )
                 .oauth2Login(oauth2 -> oauth2
                         .loginPage("/login")
+                        .userInfoEndpoint(userInfo -> userInfo
+                                .userService(oAuth2UserCustomService))
                         .defaultSuccessUrl("/", true)
                 )
 

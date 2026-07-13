@@ -24,11 +24,17 @@ public class LoginController {
                         <section class="panel">
                             <p class="eyebrow">Sharing Log</p>
                             <h1>쉐어링 로그 시작하기</h1>
-                            <p class="copy">공동생활 그룹을 관리하려면 Google 계정으로 로그인하세요.</p>
-                            <a class="google-button" href="/oauth2/authorization/google">
-                                <span class="google-mark" aria-hidden="true">G</span>
-                                <span>구글로 로그인하기</span>
-                            </a>
+                            <p class="copy">공동생활 그룹을 관리하려면 Google 또는 네이버 계정으로 로그인하세요.</p>
+                            <div class="login-buttons">
+                                <a class="google-button" href="/oauth2/authorization/google">
+                                    <span class="google-mark" aria-hidden="true">G</span>
+                                    <span>구글로 로그인하기</span>
+                                </a>
+                                <a class="naver-button" href="/oauth2/authorization/naver">
+                                    <span class="naver-mark" aria-hidden="true">N</span>
+                                    <span>네이버로 로그인하기</span>
+                                </a>
+                            </div>
                         </section>
                     </main>
                 </body>

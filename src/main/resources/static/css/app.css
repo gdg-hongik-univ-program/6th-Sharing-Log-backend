@@ -50,7 +50,13 @@ h1 {
     line-height: 1.65;
 }
 
-.google-button {
+.login-buttons {
+    display: grid;
+    gap: 12px;
+}
+
+.google-button,
+.naver-button {
     min-height: 48px;
     display: inline-flex;
     align-items: center;
@@ -67,6 +73,17 @@ h1 {
     text-decoration: none;
 }
 
+.naver-button {
+    border-color: #03c75a;
+    color: #ffffff;
+    background: #03c75a;
+}
+
+.naver-button:hover {
+    border-color: #02b351;
+    background: #02b351;
+}
+
 .google-button:hover {
     background: #f8fafd;
     border-color: #c8d7f0;
@@ -81,6 +98,11 @@ h1 {
     color: #ffffff;
     background: #4285f4;
     font-weight: 700;
+}
+
+.naver-mark {
+    font-size: 20px;
+    font-weight: 900;
 }
 
 .secondary-link {
