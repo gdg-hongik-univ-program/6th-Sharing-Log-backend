@@ -1,3 +1,4 @@
+/*
 package gdg.sharinglog.service;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -40,3 +41,5 @@ public class LocalFileStorageService implements FileStorageService {
         }
     }
 }
+
+*/
