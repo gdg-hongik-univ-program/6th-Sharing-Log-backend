@@ -10,3 +10,11 @@ spring:
               - openid
               - profile
               - email
+
+
+cloud:
+  aws:
+    region: ap-northeast-2
+
+  s3:
+    bucket: springboot-developer-neon1005

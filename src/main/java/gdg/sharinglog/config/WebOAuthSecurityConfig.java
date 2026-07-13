@@ -20,7 +20,10 @@ public class WebOAuthSecurityConfig {
                         .loginPage("/login")
                         .defaultSuccessUrl("/", true)
                 )
-                // 해당 요청만 CSRF 예외 처리하고, Spring Security 로그아웃 필터가 세션 무효화, 인증 정보 삭제, JSESSIONID 쿠키 삭제 후 204 No Content를 반환하도록 설정
+
+                // 해당 요청만 CSRF 예외 처리하고
+                // Spring Security 로그아웃 필터가 세션 무효화, 인증 정보 삭제, JSESSIONID 쿠키 삭제 후
+                // 204 No Content를 반환하도록 설정
                 .csrf(csrf -> csrf.ignoringRequestMatchers(WebOAuthSecurityConfig::isApiLogoutRequest))
                 .logout(logout -> logout
                         .logoutRequestMatcher(WebOAuthSecurityConfig::isApiLogoutRequest)
