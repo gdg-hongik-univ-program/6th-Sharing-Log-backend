@@ -1,4 +1,4 @@
-package gdg.sharinglog.web;
+package gdg.sharinglog.web.dto.web.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;

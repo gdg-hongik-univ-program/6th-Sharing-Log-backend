@@ -1,4 +1,4 @@
-package gdg.sharinglog.web;
+package gdg.sharinglog.web.dto.web;
 
 import java.util.Optional;
 

@@ -1,4 +1,4 @@
-package gdg.sharinglog.web;
+package gdg.sharinglog.web.dto.web.dto;
 
 import java.time.Instant;
 import java.util.List;

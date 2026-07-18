@@ -1,8 +1,10 @@
-package gdg.sharinglog.web;
+package gdg.sharinglog.web.dto.web;
 
 import java.net.URI;
 
 import gdg.sharinglog.service.GroupService;
+import gdg.sharinglog.web.dto.web.dto.CreateGroupRequest;
+import gdg.sharinglog.web.dto.web.dto.GroupResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
