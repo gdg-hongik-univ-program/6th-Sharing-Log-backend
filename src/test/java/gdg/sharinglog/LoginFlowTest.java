@@ -59,7 +59,31 @@ class LoginFlowTest {
                         })))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Test User님, 로그인되었습니다.")))
-                .andExpect(content().string(containsString("test@example.com")));
+                .andExpect(content().string(containsString("test@example.com")))
+                .andExpect(content().string(containsString("id=\"group-form\"")))
+                .andExpect(content().string(containsString("id=\"create-group-button\"")))
+                .andExpect(content().string(containsString("id=\"issue-invitation-button\"")))
+                .andExpect(content().string(containsString("id=\"invite-link\"")))
+                .andExpect(content().string(containsString("id=\"members-form\"")))
+                .andExpect(content().string(containsString("id=\"member-list-result\"")))
+                .andExpect(content().string(containsString("/js/group-setup.js")));
+    }
+
+    @Test
+    void homeDoesNotShowGroupSetupToAnonymousUser() throws Exception {
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        containsString("id=\"group-form\""))));
+    }
+
+    @Test
+    void groupSetupScriptIsPubliclyServed() throws Exception {
+        mockMvc.perform(get("/js/group-setup.js"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("/api/auth/csrf")))
+                .andExpect(content().string(containsString("/api/groups")))
+                .andExpect(content().string(containsString("/members")));
     }
 
     // POST /api/auth/logout 호출 시 204가 오고 세션이 invalid 처리되는지 확인

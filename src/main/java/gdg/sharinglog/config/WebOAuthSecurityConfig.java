@@ -1,6 +1,7 @@
 package gdg.sharinglog.config;
 
 import gdg.sharinglog.config.oauth.OAuth2UserCustomService;
+import gdg.sharinglog.config.oauth.OAuth2SuccessHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
@@ -11,9 +12,12 @@ import org.springframework.security.web.SecurityFilterChain;
 public class WebOAuthSecurityConfig {
 
     private final OAuth2UserCustomService oAuth2UserCustomService;
+    private final OAuth2SuccessHandler oAuth2SuccessHandler;
 
-    public WebOAuthSecurityConfig(OAuth2UserCustomService oAuth2UserCustomService) {
+    public WebOAuthSecurityConfig(OAuth2UserCustomService oAuth2UserCustomService,
+                                  OAuth2SuccessHandler oAuth2SuccessHandler) {
         this.oAuth2UserCustomService = oAuth2UserCustomService;
+        this.oAuth2SuccessHandler = oAuth2SuccessHandler;
     }
 
     @Bean
@@ -27,7 +31,7 @@ public class WebOAuthSecurityConfig {
                         .loginPage("/login")
                         .userInfoEndpoint(userInfo -> userInfo
                                 .userService(oAuth2UserCustomService))
-                        .defaultSuccessUrl("/", true)
+                        .successHandler(oAuth2SuccessHandler)
                 )
 
                 // 해당 요청만 CSRF 예외 처리하고

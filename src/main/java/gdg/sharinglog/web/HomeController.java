@@ -60,6 +60,7 @@ public class HomeController {
                     <meta name="viewport" content="width=device-width, initial-scale=1">
                     <title>Sharing Log</title>
                     <link rel="stylesheet" href="/css/app.css">
+                    <script src="/js/group-setup.js" defer></script>
                 </head>
                 <body>
                     <main class="shell">
@@ -67,6 +68,41 @@ public class HomeController {
                             <p class="eyebrow">Sharing Log</p>
                             <h1>%s님, 로그인되었습니다.</h1>
                             <p class="copy">%s</p>
+
+                            <hr>
+                            <h2>그룹 생성 및 초대 링크 확인</h2>
+                            <p>발급 결과에서 APP_PUBLIC_BASE_URL 적용 여부를 확인할 수 있습니다.</p>
+                            <form id="group-form">
+                                <p>
+                                    <label for="group-name">그룹 이름</label><br>
+                                    <input id="group-name" name="name" type="text" maxlength="50" autocomplete="off" required>
+                                    <button id="create-group-button" type="submit">그룹 생성</button>
+                                </p>
+                            </form>
+                            <pre id="group-result" role="status" aria-live="polite"></pre>
+
+                            <button id="issue-invitation-button" type="button" disabled>초대 링크 발급</button>
+                            <pre id="invitation-result" role="status" aria-live="polite"></pre>
+                            <p>
+                                <label for="invite-url">발급된 초대 링크</label><br>
+                                <input id="invite-url" type="text" readonly>
+                            </p>
+                            <a id="invite-link" href="#" target="_blank" rel="noopener noreferrer" hidden>초대 링크 열기</a>
+
+                            <hr>
+                            <section id="group-members">
+                            <h2>그룹 멤버 목록</h2>
+                            <form id="members-form">
+                                <p>
+                                    <label for="member-group-id">그룹 ID</label><br>
+                                    <input id="member-group-id" name="groupId" type="number" min="1" required>
+                                    <button id="load-members-button" type="submit">멤버 조회</button>
+                                </p>
+                            </form>
+                            <div id="member-list-result" role="status" aria-live="polite"></div>
+                            </section>
+
+                            <hr>
                             <a class="secondary-link" href="/login">로그인 화면 보기</a>
                         </section>
                     </main>
