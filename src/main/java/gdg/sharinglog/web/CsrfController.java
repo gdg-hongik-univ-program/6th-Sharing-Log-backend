@@ -1,4 +1,4 @@
-package gdg.sharinglog.web.dto.web;
+package gdg.sharinglog.web;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.security.web.csrf.CsrfToken;

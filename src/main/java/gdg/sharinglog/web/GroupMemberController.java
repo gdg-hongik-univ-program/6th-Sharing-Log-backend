@@ -1,7 +1,7 @@
-package gdg.sharinglog.web.dto.web;
+package gdg.sharinglog.web;
 
 import gdg.sharinglog.service.GroupMemberQueryService;
-import gdg.sharinglog.web.dto.web.dto.GroupMembersResponse;
+import gdg.sharinglog.web.dto.GroupMembersResponse;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;

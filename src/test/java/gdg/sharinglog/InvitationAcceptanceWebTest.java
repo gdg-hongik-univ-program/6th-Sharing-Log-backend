@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
@@ -116,6 +117,22 @@ class InvitationAcceptanceWebTest {
     }
 
     @Test
+    void invitationApiPreviewsGroupWithoutJoining() throws Exception {
+        mockMvc.perform(get("/api/invitations/{code}", INVITATION_CODE)
+                        .with(oauthUser(INVITEE_PROVIDER_ID)))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.groupId").value(group.getId()))
+                .andExpect(jsonPath("$.groupName").value(group.getName()))
+                .andExpect(jsonPath("$.alreadyMember").value(false));
+
+        assertTrue(groupMemberRepository
+                .findByGroup_IdAndUser_Id(group.getId(), invitee.getId())
+                .isEmpty());
+    }
+
+    @Test
     void acceptsInvitationAndRegistersMember() throws Exception {
         mockMvc.perform(post("/invite/{code}/accept", INVITATION_CODE)
                         .with(csrf())
@@ -140,6 +157,25 @@ class InvitationAcceptanceWebTest {
                 .andExpect(content().string(containsString(
                         "href=\"/?groupId=" + group.getId() + "#group-members\"")))
                 .andExpect(content().string(not(containsString("id=\"accept-invitation-button\""))));
+    }
+
+    @Test
+    void invitationApiAcceptsInvitationAndReturnsMembership() throws Exception {
+        mockMvc.perform(post("/api/invitations/{code}/accept", INVITATION_CODE)
+                        .with(csrf())
+                        .with(oauthUser(INVITEE_PROVIDER_ID)))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.groupId").value(group.getId()))
+                .andExpect(jsonPath("$.groupName").value(group.getName()))
+                .andExpect(jsonPath("$.role").value("MEMBER"))
+                .andExpect(jsonPath("$.joinedNow").value(true));
+
+        GroupMember membership = groupMemberRepository
+                .findByGroup_IdAndUser_Id(group.getId(), invitee.getId())
+                .orElseThrow();
+        assertEquals(GroupRole.MEMBER, membership.getRole());
     }
 
     @Test
@@ -232,6 +268,17 @@ class InvitationAcceptanceWebTest {
     @Test
     void acceptanceRequiresCsrfToken() throws Exception {
         mockMvc.perform(post("/invite/{code}/accept", INVITATION_CODE)
+                        .with(oauthUser(INVITEE_PROVIDER_ID)))
+                .andExpect(status().isForbidden());
+
+        assertTrue(groupMemberRepository
+                .findByGroup_IdAndUser_Id(group.getId(), invitee.getId())
+                .isEmpty());
+    }
+
+    @Test
+    void invitationApiAcceptanceRequiresCsrfToken() throws Exception {
+        mockMvc.perform(post("/api/invitations/{code}/accept", INVITATION_CODE)
                         .with(oauthUser(INVITEE_PROVIDER_ID)))
                 .andExpect(status().isForbidden());
 

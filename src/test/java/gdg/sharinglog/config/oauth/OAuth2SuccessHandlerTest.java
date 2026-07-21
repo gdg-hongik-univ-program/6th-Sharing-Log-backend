@@ -22,7 +22,10 @@ class OAuth2SuccessHandlerTest {
     @Test
     void persistsAuthenticatedOAuth2UserBeforeRedirect() throws Exception {
         OAuth2UserPersistenceService persistenceService = mock(OAuth2UserPersistenceService.class);
-        OAuth2SuccessHandler successHandler = new OAuth2SuccessHandler(persistenceService);
+        OAuth2SuccessHandler successHandler = new OAuth2SuccessHandler(
+                persistenceService,
+                "http://localhost:5173/"
+        );
         OAuth2User principal = new DefaultOAuth2User(
                 Set.of(new SimpleGrantedAuthority("ROLE_USER")),
                 Map.of("id", "naver-user-id", "email", "naver@example.com"),
@@ -39,13 +42,16 @@ class OAuth2SuccessHandlerTest {
         successHandler.onAuthenticationSuccess(request, response, authentication);
 
         verify(persistenceService).saveOrUpdate("naver", principal);
-        assertEquals("/", response.getRedirectedUrl());
+        assertEquals("http://localhost:5173/house-choice", response.getRedirectedUrl());
     }
 
     @Test
-    void redirectsToSavedInvitationRequestAfterLogin() throws Exception {
+    void redirectsToFrontendEvenWhenInvitationRequestWasSaved() throws Exception {
         OAuth2UserPersistenceService persistenceService = mock(OAuth2UserPersistenceService.class);
-        OAuth2SuccessHandler successHandler = new OAuth2SuccessHandler(persistenceService);
+        OAuth2SuccessHandler successHandler = new OAuth2SuccessHandler(
+                persistenceService,
+                "http://localhost:5173"
+        );
         OAuth2User principal = new DefaultOAuth2User(
                 Set.of(new SimpleGrantedAuthority("ROLE_USER")),
                 Map.of("sub", "google-user-id", "email", "google@example.com"),
@@ -70,9 +76,6 @@ class OAuth2SuccessHandlerTest {
         successHandler.onAuthenticationSuccess(callbackRequest, response, authentication);
 
         verify(persistenceService).saveOrUpdate("google", principal);
-        assertEquals(
-                "http://localhost/invite/AbCdEfGhIjKlMnOpQrStUv?continue",
-                response.getRedirectedUrl()
-        );
+        assertEquals("http://localhost:5173/house-choice", response.getRedirectedUrl());
     }
 }

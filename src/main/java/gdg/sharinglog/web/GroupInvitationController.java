@@ -1,10 +1,10 @@
-package gdg.sharinglog.web.dto.web;
+package gdg.sharinglog.web;
 
 import java.net.URI;
 
 import gdg.sharinglog.service.GroupInvitationService;
 import gdg.sharinglog.service.IssuedInvitation;
-import gdg.sharinglog.web.dto.web.dto.InvitationResponse;
+import gdg.sharinglog.web.dto.InvitationResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
