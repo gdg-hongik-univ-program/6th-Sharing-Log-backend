@@ -24,7 +24,17 @@ public class WebOAuthSecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         return http
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/", "/login", "/css/**", "/img/**", "/js/**", "/favicon.ico").permitAll()
+                        .requestMatchers(
+                                "/",
+                                "/login",
+                                "/css/**",
+                                "/img/**",
+                                "/js/**",
+                                "/favicon.ico",
+                                "/swagger-ui.html",
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**"
+                        ).permitAll()
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2 -> oauth2

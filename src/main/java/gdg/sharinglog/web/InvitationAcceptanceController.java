@@ -1,4 +1,4 @@
-package gdg.sharinglog.web.dto.web;
+package gdg.sharinglog.web;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
