@@ -1,6 +1,6 @@
 package gdg.sharinglog.web;
 
-import gdg.sharinglog.service.GroupMemberQueryService;
+import gdg.sharinglog.service.group.GroupMemberQueryService;
 import gdg.sharinglog.web.dto.GroupMembersResponse;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;

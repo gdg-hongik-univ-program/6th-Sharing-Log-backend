@@ -1,8 +1,8 @@
 package gdg.sharinglog.web;
 
-import gdg.sharinglog.service.AcceptedInvitation;
-import gdg.sharinglog.service.InvitationAcceptanceService;
-import gdg.sharinglog.service.InvitationPreview;
+import gdg.sharinglog.service.invitation.InvitationAcceptanceService;
+import gdg.sharinglog.service.invitation.result.AcceptedInvitation;
+import gdg.sharinglog.service.invitation.result.InvitationPreview;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;

@@ -1,4 +1,4 @@
-package gdg.sharinglog.service;
+package gdg.sharinglog.service.group.result;
 
 import java.time.Instant;
 import java.util.List;

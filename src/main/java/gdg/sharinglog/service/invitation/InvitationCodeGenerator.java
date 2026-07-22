@@ -1,4 +1,4 @@
-package gdg.sharinglog.service;
+package gdg.sharinglog.service.invitation;
 
 import java.security.SecureRandom;
 import java.util.Base64;

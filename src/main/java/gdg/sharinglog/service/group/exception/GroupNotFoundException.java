@@ -1,4 +1,4 @@
-package gdg.sharinglog.service;
+package gdg.sharinglog.service.group.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ResponseStatus;

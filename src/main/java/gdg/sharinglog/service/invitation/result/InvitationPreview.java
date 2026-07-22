@@ -1,4 +1,4 @@
-package gdg.sharinglog.service;
+package gdg.sharinglog.service.invitation.result;
 
 import java.time.Instant;
 

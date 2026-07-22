@@ -1,10 +1,12 @@
-package gdg.sharinglog.service;
+package gdg.sharinglog.service.group;
 
 import gdg.sharinglog.domain.GroupMember;
 import gdg.sharinglog.domain.SharingGroup;
 import gdg.sharinglog.domain.User;
 import gdg.sharinglog.repository.GroupMemberRepository;
 import gdg.sharinglog.repository.SharingGroupRepository;
+import gdg.sharinglog.service.group.result.CreatedGroup;
+import gdg.sharinglog.service.user.AuthenticatedUserService;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

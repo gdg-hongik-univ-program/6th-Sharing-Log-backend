@@ -3,11 +3,11 @@ package gdg.sharinglog.web;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 
-import gdg.sharinglog.service.AcceptedInvitation;
-import gdg.sharinglog.service.InvitationAcceptanceService;
-import gdg.sharinglog.service.InvitationNotFoundException;
-import gdg.sharinglog.service.InvitationPreview;
-import gdg.sharinglog.service.InvitationUnavailableException;
+import gdg.sharinglog.service.invitation.InvitationAcceptanceService;
+import gdg.sharinglog.service.invitation.exception.InvitationNotFoundException;
+import gdg.sharinglog.service.invitation.exception.InvitationUnavailableException;
+import gdg.sharinglog.service.invitation.result.AcceptedInvitation;
+import gdg.sharinglog.service.invitation.result.InvitationPreview;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;

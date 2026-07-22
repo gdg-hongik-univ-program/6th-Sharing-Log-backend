@@ -2,7 +2,7 @@ package gdg.sharinglog.web.dto;
 
 import java.time.Instant;
 
-import gdg.sharinglog.service.IssuedInvitation;
+import gdg.sharinglog.service.invitation.result.IssuedInvitation;
 
 public record InvitationResponse(
         Long invitationId,
