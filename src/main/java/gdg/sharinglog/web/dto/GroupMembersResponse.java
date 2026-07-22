@@ -4,7 +4,7 @@ import java.time.Instant;
 import java.util.List;
 
 import gdg.sharinglog.domain.GroupRole;
-import gdg.sharinglog.service.GroupMembers;
+import gdg.sharinglog.service.group.result.GroupMembers;
 
 public record GroupMembersResponse(
         Long groupId,

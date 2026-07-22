@@ -1,4 +1,4 @@
-package gdg.sharinglog.service;
+package gdg.sharinglog.service.invitation;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;

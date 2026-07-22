@@ -1,8 +1,9 @@
-package gdg.sharinglog.service;
+package gdg.sharinglog.service.user;
 
 import gdg.sharinglog.config.oauth.OAuth2UserIdentity;
 import gdg.sharinglog.domain.User;
 import gdg.sharinglog.repository.UserRepository;
+import gdg.sharinglog.service.user.exception.AuthenticatedUserNotFoundException;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

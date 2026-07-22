@@ -3,7 +3,7 @@ package gdg.sharinglog.web.dto;
 import java.time.Instant;
 
 import gdg.sharinglog.domain.GroupRole;
-import gdg.sharinglog.service.CreatedGroup;
+import gdg.sharinglog.service.group.result.CreatedGroup;
 
 public record GroupResponse(
         Long groupId,

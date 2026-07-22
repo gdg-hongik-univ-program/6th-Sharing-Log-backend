@@ -1,5 +1,5 @@
 /*
-package gdg.sharinglog.service;
+package gdg.sharinglog.service.storage;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;

@@ -29,7 +29,7 @@ import gdg.sharinglog.repository.GroupInvitationRepository;
 import gdg.sharinglog.repository.GroupMemberRepository;
 import gdg.sharinglog.repository.SharingGroupRepository;
 import gdg.sharinglog.repository.UserRepository;
-import gdg.sharinglog.service.InvitationCodeHasher;
+import gdg.sharinglog.service.invitation.InvitationCodeHasher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
