@@ -58,6 +58,7 @@ public class InvitationAcceptanceService {
 
         return new InvitationPreview(
                 group.getId(),
+                group.getPublicId(),
                 group.getName(),
                 invitation.getExpiresAt(),
                 membership.isPresent(),
@@ -114,8 +115,10 @@ public class InvitationAcceptanceService {
     private AcceptedInvitation acceptance(GroupMember membership, boolean joinedNow) {
         return new AcceptedInvitation(
                 membership.getGroup().getId(),
+                membership.getGroup().getPublicId(),
                 membership.getGroup().getName(),
                 membership.getId(),
+                membership.getPublicId(),
                 membership.getRole(),
                 membership.getJoinedAt(),
                 joinedNow
