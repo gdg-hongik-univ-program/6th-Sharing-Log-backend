@@ -4,8 +4,13 @@ import java.util.List;
 import java.util.Optional;
 
 import gdg.sharinglog.domain.GroupMember;
+import gdg.sharinglog.domain.MemberStatus;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> {
 
@@ -13,4 +18,10 @@ public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> 
 
     @EntityGraph(attributePaths = "user")
     List<GroupMember> findAllByGroup_Id(Long groupId);
+
+    List<GroupMember> findAllByGroup_IdAndStatusOrderById(Long groupId, MemberStatus status);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select member from GroupMember member where member.publicId = :publicId")
+    Optional<GroupMember> findByPublicIdForUpdate(@Param("publicId") String publicId);
 }

@@ -1,0 +1,8 @@
+package gdg.sharinglog.domain.rotation;
+
+public enum AssignmentTrigger {
+    INITIAL,
+    DECLINE_REASSIGNMENT,
+    MEMBER_LEFT_REASSIGNMENT,
+    NEEDS_ATTENTION_RETRY
+}
