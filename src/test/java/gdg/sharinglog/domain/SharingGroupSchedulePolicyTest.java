@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.time.DayOfWeek;
 import java.time.ZoneId;
+import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 
@@ -15,6 +16,7 @@ class SharingGroupSchedulePolicyTest {
 
         assertEquals(ZoneId.of("Asia/Seoul"), group.timeZone());
         assertEquals(DayOfWeek.MONDAY, group.getWeekStartsOn());
+        assertEquals(group.getPublicId(), UUID.fromString(group.getPublicId()).toString());
     }
 
     @Test

@@ -232,19 +232,45 @@ public class ChoreOccurrence {
     }
 
     public void complete(Instant completedAt) {
-        close(OccurrenceStatus.COMPLETED, AssignmentEndReason.COMPLETED, completedAt);
+        complete(completedAt, null);
+    }
+
+    public void complete(Instant completedAt, String actorNote) {
+        close(
+                OccurrenceStatus.COMPLETED,
+                AssignmentEndReason.COMPLETED,
+                completedAt,
+                actorNote
+        );
     }
 
     public void skipAlreadyDone(Instant skippedAt) {
-        close(OccurrenceStatus.SKIPPED, AssignmentEndReason.SKIPPED_ALREADY_DONE, skippedAt);
+        skipAlreadyDone(skippedAt, null);
+    }
+
+    public void skipAlreadyDone(Instant skippedAt, String actorNote) {
+        close(
+                OccurrenceStatus.SKIPPED,
+                AssignmentEndReason.SKIPPED_ALREADY_DONE,
+                skippedAt,
+                actorNote
+        );
     }
 
     public void releaseForReassignment(AssignmentEndReason reason, Instant endedAt) {
+        releaseForReassignment(reason, endedAt, null);
+    }
+
+    public void releaseForReassignment(
+            AssignmentEndReason reason,
+            Instant endedAt,
+            String actorNote
+    ) {
         if (!Objects.requireNonNull(reason, "배정 종료 사유는 필수입니다.").requiresReassignment()) {
             throw new IllegalArgumentException("재배정이 필요한 종료 사유만 사용할 수 있습니다.");
         }
         requireAssigned();
-        currentAssignment.end(reason, endedAt);
+        currentAssignment.end(reason, endedAt, actorNote);
         currentAssignment = null;
         status = OccurrenceStatus.NEEDS_ATTENTION;
     }
@@ -256,13 +282,18 @@ public class ChoreOccurrence {
         eligibilitySnapshotVersion++;
     }
 
-    private void close(OccurrenceStatus terminalStatus, AssignmentEndReason reason, Instant endedAt) {
+    private void close(
+            OccurrenceStatus terminalStatus,
+            AssignmentEndReason reason,
+            Instant endedAt,
+            String actorNote
+    ) {
         if (!terminalStatus.isTerminal()) {
             throw new IllegalArgumentException("종료 상태가 아닙니다.");
         }
         requireAssigned();
         Instant effectiveEndedAt = Objects.requireNonNull(endedAt, "종료 시각은 필수입니다.");
-        currentAssignment.end(reason, effectiveEndedAt);
+        currentAssignment.end(reason, effectiveEndedAt, actorNote);
         currentAssignment = null;
         status = terminalStatus;
         closedAt = effectiveEndedAt;

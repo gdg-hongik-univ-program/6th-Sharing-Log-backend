@@ -18,6 +18,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.Version;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -72,6 +73,10 @@ public class GroupMember {
 
     @Column(name = "left_at")
     private Instant leftAt;
+
+    @Version
+    @Column(name = "version", nullable = false)
+    private long version;
 
     private GroupMember(SharingGroup group, User user, GroupRole role) {
         this.group = Objects.requireNonNull(group, "그룹은 필수입니다.");

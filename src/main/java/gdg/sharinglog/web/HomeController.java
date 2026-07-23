@@ -80,6 +80,11 @@ public class HomeController {
                                 </p>
                             </form>
                             <pre id="group-result" role="status" aria-live="polite"></pre>
+                            <p>
+                                <a id="rotation-link" class="secondary-link" href="/rotation.html" hidden>
+                                    업무 로테이션 열기
+                                </a>
+                            </p>
 
                             <button id="issue-invitation-button" type="button" disabled>초대 링크 발급</button>
                             <pre id="invitation-result" role="status" aria-live="polite"></pre>

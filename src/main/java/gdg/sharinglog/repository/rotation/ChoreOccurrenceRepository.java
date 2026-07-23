@@ -18,6 +18,35 @@ public interface ChoreOccurrenceRepository extends JpaRepository<ChoreOccurrence
     @EntityGraph(attributePaths = {"chore", "currentAssignment", "currentAssignment.assignee"})
     Optional<ChoreOccurrence> findByPublicId(String publicId);
 
+    @EntityGraph(attributePaths = {
+            "chore",
+            "currentAssignment",
+            "currentAssignment.assignee",
+            "currentAssignment.assignee.user"
+    })
+    Optional<ChoreOccurrence> findByPublicIdAndChore_Group_PublicId(
+            String publicId,
+            String groupPublicId
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = {
+            "chore",
+            "currentAssignment",
+            "currentAssignment.assignee",
+            "currentAssignment.assignee.user"
+    })
+    @Query("""
+            select occurrence
+            from ChoreOccurrence occurrence
+            where occurrence.publicId = :publicId
+              and occurrence.chore.group.publicId = :groupPublicId
+            """)
+    Optional<ChoreOccurrence> findByPublicIdAndGroupPublicIdForUpdate(
+            @Param("publicId") String publicId,
+            @Param("groupPublicId") String groupPublicId
+    );
+
     @Query("""
             select occurrence.chore.group.id
             from ChoreOccurrence occurrence
@@ -62,5 +91,24 @@ public interface ChoreOccurrenceRepository extends JpaRepository<ChoreOccurrence
             Long groupId,
             LocalDate fromInclusive,
             LocalDate toInclusive
+    );
+
+    @EntityGraph(attributePaths = {
+            "chore",
+            "currentAssignment",
+            "currentAssignment.assignee",
+            "currentAssignment.assignee.user"
+    })
+    @Query("""
+            select occurrence
+            from ChoreOccurrence occurrence
+            where occurrence.chore.group.id = :groupId
+              and occurrence.periodStart <= :activeOn
+              and occurrence.periodEndExclusive > :activeOn
+            order by occurrence.frequencySnapshot asc, occurrence.dueAt asc, occurrence.id asc
+            """)
+    List<ChoreOccurrence> findAllActiveOn(
+            @Param("groupId") Long groupId,
+            @Param("activeOn") LocalDate activeOn
     );
 }

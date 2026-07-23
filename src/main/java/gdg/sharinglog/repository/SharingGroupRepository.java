@@ -11,6 +11,16 @@ import org.springframework.data.repository.query.Param;
 
 public interface SharingGroupRepository extends JpaRepository<SharingGroup, Long> {
 
+    Optional<SharingGroup> findByPublicId(String publicId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select sharingGroup
+            from SharingGroup sharingGroup
+            where sharingGroup.publicId = :publicId
+            """)
+    Optional<SharingGroup> findByPublicIdForUpdate(@Param("publicId") String publicId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select sharingGroup from SharingGroup sharingGroup where sharingGroup.id = :groupId")
     Optional<SharingGroup> findByIdForUpdate(@Param("groupId") Long groupId);

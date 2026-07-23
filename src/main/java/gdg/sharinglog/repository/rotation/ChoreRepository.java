@@ -17,6 +17,30 @@ public interface ChoreRepository extends JpaRepository<Chore, Long> {
 
     List<Chore> findAllByGroup_IdAndActiveTrueOrderById(Long groupId);
 
+    @Query("""
+            select chore
+            from Chore chore
+            where chore.active = true
+            order by chore.group.id asc, chore.id asc
+            """)
+    List<Chore> findAllActiveForOccurrenceGeneration();
+
+    @EntityGraph(attributePaths = {"group", "createdBy", "createdBy.user"})
+    List<Chore> findAllByGroup_IdOrderById(Long groupId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = "group")
+    @Query("""
+            select chore
+            from Chore chore
+            where chore.publicId = :publicId
+              and chore.group.publicId = :groupPublicId
+            """)
+    Optional<Chore> findByPublicIdAndGroupPublicIdForUpdate(
+            @Param("publicId") String publicId,
+            @Param("groupPublicId") String groupPublicId
+    );
+
     @Query("select chore.group.id from Chore chore where chore.id = :choreId")
     Optional<Long> findGroupIdById(@Param("choreId") Long choreId);
 

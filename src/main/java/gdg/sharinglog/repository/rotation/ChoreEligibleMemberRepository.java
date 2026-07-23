@@ -8,6 +8,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ChoreEligibleMemberRepository extends JpaRepository<ChoreEligibleMember, Long> {
 
-    @EntityGraph(attributePaths = "member")
+    @EntityGraph(attributePaths = {"member", "member.user"})
     List<ChoreEligibleMember> findAllByChore_IdOrderById(Long choreId);
 }

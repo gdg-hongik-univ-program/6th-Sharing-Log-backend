@@ -99,6 +99,9 @@ public class ChoreAssignmentAttempt {
     @Column(name = "decision_summary", nullable = false, length = 500)
     private String decisionSummary;
 
+    @Column(name = "actor_note", length = 500)
+    private String actorNote;
+
     private ChoreAssignmentAttempt(
             ChoreOccurrence occurrence,
             GroupMember assignee,
@@ -154,6 +157,10 @@ public class ChoreAssignmentAttempt {
     }
 
     void end(AssignmentEndReason endReason, Instant endedAt) {
+        end(endReason, endedAt, null);
+    }
+
+    void end(AssignmentEndReason endReason, Instant endedAt, String actorNote) {
         if (!isActive()) {
             throw new IllegalStateException("이미 종료된 배정 시도입니다.");
         }
@@ -161,9 +168,13 @@ public class ChoreAssignmentAttempt {
         if (effectiveEndedAt.isBefore(assignedAt)) {
             throw new IllegalArgumentException("배정 종료 시각은 배정 시각보다 빠를 수 없습니다.");
         }
-        this.endReason = Objects.requireNonNull(endReason, "배정 종료 사유는 필수입니다.");
+        AssignmentEndReason requiredEndReason =
+                Objects.requireNonNull(endReason, "배정 종료 사유는 필수입니다.");
+        String normalizedActorNote = normalizeOptionalNote(actorNote);
+        this.endReason = requiredEndReason;
         this.endedAt = effectiveEndedAt;
         this.activeMarker = null;
+        this.actorNote = normalizedActorNote;
     }
 
     private static GroupMember requireEligibleGroupMember(
@@ -186,5 +197,19 @@ public class ChoreAssignmentAttempt {
             throw new IllegalArgumentException(message);
         }
         return required;
+    }
+
+    private static String normalizeOptionalNote(String value) {
+        if (value == null) {
+            return null;
+        }
+        String normalized = value.trim();
+        if (normalized.isEmpty()) {
+            return null;
+        }
+        if (normalized.length() > 500) {
+            throw new IllegalArgumentException("처리 메모는 500자 이하여야 합니다.");
+        }
+        return normalized;
     }
 }

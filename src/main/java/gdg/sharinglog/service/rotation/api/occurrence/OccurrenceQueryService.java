@@ -1,0 +1,87 @@
+package gdg.sharinglog.service.rotation.api.occurrence;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Set;
+
+import gdg.sharinglog.domain.GroupMember;
+import gdg.sharinglog.domain.rotation.ChoreFrequency;
+import gdg.sharinglog.domain.rotation.ChoreOccurrence;
+import gdg.sharinglog.domain.rotation.OccurrenceStatus;
+import gdg.sharinglog.repository.rotation.ChoreOccurrenceRepository;
+import gdg.sharinglog.service.rotation.access.RotationActor;
+import gdg.sharinglog.service.rotation.access.RotationActorAccessService;
+import gdg.sharinglog.web.rotation.RotationViewMapper;
+import gdg.sharinglog.web.rotation.dto.OccurrenceListResponse;
+import org.springframework.security.oauth2.core.user.OAuth2User;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class OccurrenceQueryService {
+
+    private final RotationActorAccessService accessService;
+    private final ChoreOccurrenceRepository occurrenceRepository;
+    private final RotationViewMapper viewMapper;
+
+    public OccurrenceQueryService(
+            RotationActorAccessService accessService,
+            ChoreOccurrenceRepository occurrenceRepository,
+            RotationViewMapper viewMapper
+    ) {
+        this.accessService = accessService;
+        this.occurrenceRepository = occurrenceRepository;
+        this.viewMapper = viewMapper;
+    }
+
+    @Transactional(readOnly = true)
+    public OccurrenceListResponse findActiveOn(
+            String groupPublicId,
+            String registrationId,
+            OAuth2User principal,
+            ChoreFrequency frequency,
+            LocalDate activeOn,
+            Set<OccurrenceStatus> statuses,
+            boolean mineOnly,
+            String chorePublicId
+    ) {
+        RotationActor actor =
+                accessService.requireActiveMember(groupPublicId, registrationId, principal);
+        LocalDate effectiveDate = activeOn == null
+                ? LocalDate.now(actor.group().timeZone())
+                : activeOn;
+        Set<OccurrenceStatus> effectiveStatuses =
+                statuses == null ? Set.of() : Set.copyOf(statuses);
+
+        List<ChoreOccurrence> occurrences = occurrenceRepository
+                .findAllActiveOn(actor.group().getId(), effectiveDate)
+                .stream()
+                .filter(item -> frequency == null || item.getFrequencySnapshot() == frequency)
+                .filter(item -> effectiveStatuses.isEmpty()
+                        || effectiveStatuses.contains(item.getStatus()))
+                .filter(item -> chorePublicId == null
+                        || item.getChore().getPublicId().equals(chorePublicId))
+                .filter(item -> !mineOnly || isCurrentAssignee(item, actor.membership()))
+                .toList();
+
+        return new OccurrenceListResponse(
+                actor.group().getPublicId(),
+                frequency,
+                new OccurrenceListResponse.QueryResponse(
+                        effectiveDate,
+                        actor.group().getTimeZoneId()
+                ),
+                occurrences.stream().map(item -> viewMapper.occurrence(item, actor)).toList(),
+                null,
+                false
+        );
+    }
+
+    private boolean isCurrentAssignee(ChoreOccurrence occurrence, GroupMember actor) {
+        return occurrence.getStatus() == OccurrenceStatus.ASSIGNED
+                && occurrence.currentAssignee()
+                .map(GroupMember::getId)
+                .filter(actor.getId()::equals)
+                .isPresent();
+    }
+}

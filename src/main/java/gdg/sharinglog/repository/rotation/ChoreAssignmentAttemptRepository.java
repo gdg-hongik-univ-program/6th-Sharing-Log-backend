@@ -20,6 +20,7 @@ public interface ChoreAssignmentAttemptRepository
     @EntityGraph(attributePaths = "assignee")
     Optional<ChoreAssignmentAttempt> findFirstByOccurrence_IdAndEndedAtIsNull(Long occurrenceId);
 
+    @EntityGraph(attributePaths = {"assignee", "assignee.user"})
     Optional<ChoreAssignmentAttempt>
     findFirstByOccurrence_IdOrderBySequenceNumberDesc(Long occurrenceId);
 

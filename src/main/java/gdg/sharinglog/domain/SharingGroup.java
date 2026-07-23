@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.time.DayOfWeek;
 import java.time.ZoneId;
 import java.util.Objects;
+import java.util.UUID;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -35,6 +36,9 @@ public class SharingGroup {
     @Column(name = "id", updatable = false)
     private Long id;
 
+    @Column(name = "public_id", nullable = false, updatable = false, unique = true, length = 36)
+    private String publicId;
+
     @Column(name = "name", nullable = false, length = 50)
     private String name;
 
@@ -57,6 +61,7 @@ public class SharingGroup {
     private DayOfWeek weekStartsOn;
 
     public SharingGroup(String name, User createdBy) {
+        this.publicId = UUID.randomUUID().toString();
         this.name = Objects.requireNonNull(name, "그룹 이름은 필수입니다.");
         this.createdBy = Objects.requireNonNull(createdBy, "그룹 생성자는 필수입니다.");
         this.createdAt = Instant.now();

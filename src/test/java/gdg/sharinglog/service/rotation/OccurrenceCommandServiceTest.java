@@ -272,6 +272,19 @@ class OccurrenceCommandServiceTest {
     }
 
     @Test
+    void lastOwnerCannotLeaveGroup() {
+        Context context = context("last-owner");
+        GroupMember owner = context.members().getFirst();
+
+        assertThrows(
+                LastOwnerCannotLeaveException.class,
+                () -> commandService.leaveMember(owner.getPublicId(), ACTION_AT)
+        );
+
+        assertEquals(MemberStatus.ACTIVE, owner.getStatus());
+    }
+
+    @Test
     void nonAssigneeCannotCompleteOccurrence() {
         Context context = context("non-assignee");
         ChoreOccurrence occurrence = generate(context);

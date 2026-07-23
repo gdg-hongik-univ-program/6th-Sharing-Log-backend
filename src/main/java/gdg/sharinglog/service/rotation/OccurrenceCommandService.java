@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Objects;
 
 import gdg.sharinglog.domain.GroupMember;
+import gdg.sharinglog.domain.GroupRole;
+import gdg.sharinglog.domain.MemberStatus;
 import gdg.sharinglog.domain.rotation.AssignmentEndReason;
 import gdg.sharinglog.domain.rotation.AssignmentTrigger;
 import gdg.sharinglog.domain.rotation.ChoreOccurrence;
@@ -50,6 +52,16 @@ public class OccurrenceCommandService {
             String actorMemberPublicId,
             Instant completedAt
     ) {
+        return complete(occurrencePublicId, actorMemberPublicId, completedAt, null);
+    }
+
+    @Transactional
+    public ChoreOccurrence complete(
+            String occurrencePublicId,
+            String actorMemberPublicId,
+            Instant completedAt,
+            String actorNote
+    ) {
         ChoreOccurrence occurrence = lockedOccurrence(occurrencePublicId);
         GroupMember actor = requireActorOfOccurrence(actorMemberPublicId, occurrence);
         if (occurrence.getStatus() == OccurrenceStatus.COMPLETED) {
@@ -57,8 +69,11 @@ public class OccurrenceCommandService {
             return occurrence;
         }
         requireCurrentAssignee(occurrence, actor);
-        occurrence.complete(Objects.requireNonNull(completedAt, "완료 시각은 필수입니다."));
-        return occurrenceRepository.save(occurrence);
+        occurrence.complete(
+                Objects.requireNonNull(completedAt, "완료 시각은 필수입니다."),
+                actorNote
+        );
+        return occurrenceRepository.saveAndFlush(occurrence);
     }
 
     @Transactional
@@ -66,6 +81,16 @@ public class OccurrenceCommandService {
             String occurrencePublicId,
             String actorMemberPublicId,
             Instant skippedAt
+    ) {
+        return skipAlreadyDone(occurrencePublicId, actorMemberPublicId, skippedAt, null);
+    }
+
+    @Transactional
+    public ChoreOccurrence skipAlreadyDone(
+            String occurrencePublicId,
+            String actorMemberPublicId,
+            Instant skippedAt,
+            String actorNote
     ) {
         ChoreOccurrence occurrence = lockedOccurrence(occurrencePublicId);
         GroupMember actor = requireActorOfOccurrence(actorMemberPublicId, occurrence);
@@ -78,8 +103,11 @@ public class OccurrenceCommandService {
             return occurrence;
         }
         requireCurrentAssignee(occurrence, actor);
-        occurrence.skipAlreadyDone(Objects.requireNonNull(skippedAt, "생략 시각은 필수입니다."));
-        return occurrenceRepository.save(occurrence);
+        occurrence.skipAlreadyDone(
+                Objects.requireNonNull(skippedAt, "생략 시각은 필수입니다."),
+                actorNote
+        );
+        return occurrenceRepository.saveAndFlush(occurrence);
     }
 
     @Transactional
@@ -87,6 +115,21 @@ public class OccurrenceCommandService {
             String occurrencePublicId,
             String actorMemberPublicId,
             Instant declinedAt
+    ) {
+        return declineCurrentOccurrence(
+                occurrencePublicId,
+                actorMemberPublicId,
+                declinedAt,
+                null
+        );
+    }
+
+    @Transactional
+    public ChoreOccurrence declineCurrentOccurrence(
+            String occurrencePublicId,
+            String actorMemberPublicId,
+            Instant declinedAt,
+            String actorNote
     ) {
         ChoreOccurrence occurrence = lockedOccurrence(occurrencePublicId);
         GroupMember actor = requireActorOfOccurrence(actorMemberPublicId, occurrence);
@@ -102,7 +145,8 @@ public class OccurrenceCommandService {
         Instant effectiveDeclinedAt = Objects.requireNonNull(declinedAt, "수행 불가 시각은 필수입니다.");
         occurrence.releaseForReassignment(
                 AssignmentEndReason.DECLINED_BY_ASSIGNEE,
-                effectiveDeclinedAt
+                effectiveDeclinedAt,
+                actorNote
         );
         occurrenceRepository.saveAndFlush(occurrence);
         assignmentService.assign(
@@ -110,6 +154,7 @@ public class OccurrenceCommandService {
                 AssignmentTrigger.DECLINE_REASSIGNMENT,
                 effectiveDeclinedAt
         );
+        occurrenceRepository.flush();
         return occurrence;
     }
 
@@ -128,6 +173,14 @@ public class OccurrenceCommandService {
                 .orElseThrow(() -> new MemberNotFoundException(memberPublicId));
         if (!member.isActive()) {
             return List.of();
+        }
+        if (member.getRole() == GroupRole.OWNER
+                && groupMemberRepository.countByGroup_IdAndStatusAndRole(
+                        groupId,
+                        MemberStatus.ACTIVE,
+                        GroupRole.OWNER
+                ) <= 1) {
+            throw new LastOwnerCannotLeaveException();
         }
 
         List<ChoreOccurrence> lockedAffected = occurrenceRepository
@@ -158,6 +211,7 @@ public class OccurrenceCommandService {
                     effectiveLeftAt
             );
         }
+        occurrenceRepository.flush();
         return affected;
     }
 
@@ -187,6 +241,9 @@ public class OccurrenceCommandService {
         if (actor.getGroup().getId() == null
                 || !actor.getGroup().getId().equals(occurrence.getChore().getGroup().getId())) {
             throw new OccurrenceCommandConflictException("회차와 같은 그룹의 멤버만 처리할 수 있습니다.");
+        }
+        if (!actor.isActive()) {
+            throw new OccurrenceCommandConflictException("탈퇴한 멤버는 회차를 처리할 수 없습니다.");
         }
         return actor;
     }
