@@ -12,6 +12,7 @@ import gdg.sharinglog.domain.rotation.ChoreEligibilityMode;
 import gdg.sharinglog.domain.rotation.ChoreOccurrence;
 import gdg.sharinglog.domain.rotation.OccurrenceEligibleMember;
 import gdg.sharinglog.repository.GroupMemberRepository;
+import gdg.sharinglog.repository.SharingGroupRepository;
 import gdg.sharinglog.repository.rotation.ChoreEligibleMemberRepository;
 import gdg.sharinglog.repository.rotation.ChoreOccurrenceRepository;
 import gdg.sharinglog.repository.rotation.ChoreRepository;
@@ -22,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class OccurrenceGenerationService {
 
+    private final SharingGroupRepository sharingGroupRepository;
     private final ChoreRepository choreRepository;
     private final ChoreEligibleMemberRepository choreEligibleMemberRepository;
     private final ChoreOccurrenceRepository occurrenceRepository;
@@ -31,6 +33,7 @@ public class OccurrenceGenerationService {
     private final RotationAssignmentService assignmentService;
 
     public OccurrenceGenerationService(
+            SharingGroupRepository sharingGroupRepository,
             ChoreRepository choreRepository,
             ChoreEligibleMemberRepository choreEligibleMemberRepository,
             ChoreOccurrenceRepository occurrenceRepository,
@@ -39,6 +42,7 @@ public class OccurrenceGenerationService {
             ChoreOccurrenceScheduleResolver scheduleResolver,
             RotationAssignmentService assignmentService
     ) {
+        this.sharingGroupRepository = sharingGroupRepository;
         this.choreRepository = choreRepository;
         this.choreEligibleMemberRepository = choreEligibleMemberRepository;
         this.occurrenceRepository = occurrenceRepository;
@@ -52,6 +56,10 @@ public class OccurrenceGenerationService {
     public ChoreOccurrence ensureCurrentOccurrence(Long choreId, Instant referenceInstant) {
         Objects.requireNonNull(choreId, "업무 ID는 필수입니다.");
         Objects.requireNonNull(referenceInstant, "기준 시각은 필수입니다.");
+        Long groupId = choreRepository.findGroupIdById(choreId)
+                .orElseThrow(() -> new ChoreNotFoundException(choreId));
+        sharingGroupRepository.findByIdForUpdate(groupId)
+                .orElseThrow(() -> new IllegalStateException("업무의 그룹을 찾을 수 없습니다."));
         Chore chore = choreRepository.findByIdForUpdate(choreId)
                 .orElseThrow(() -> new ChoreNotFoundException(choreId));
         if (!chore.isActive()) {
@@ -89,7 +97,7 @@ public class OccurrenceGenerationService {
                 ))
                 .toList();
         occurrenceEligibleMemberRepository.saveAllAndFlush(snapshots);
-        assignmentService.assign(occurrence, AssignmentTrigger.INITIAL, createdAt);
+        assignmentService.assign(occurrence.getId(), AssignmentTrigger.INITIAL, createdAt);
         return occurrence;
     }
 

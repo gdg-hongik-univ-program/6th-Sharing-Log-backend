@@ -2,6 +2,8 @@ package gdg.sharinglog.domain.rotation;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -82,6 +84,16 @@ public class ChoreOccurrence {
     @Column(name = "status", nullable = false, length = 30)
     private OccurrenceStatus status;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "attention_reason", length = 60)
+    private NoCandidateReason attentionReason;
+
+    @Column(name = "attention_since")
+    private Instant attentionSince;
+
+    @Column(name = "last_decision_at")
+    private Instant lastDecisionAt;
+
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(
             name = "current_assignment_id",
@@ -116,10 +128,57 @@ public class ChoreOccurrence {
             throw new IllegalArgumentException("기간 종료일은 시작일보다 뒤여야 합니다.");
         }
         this.dueAt = Objects.requireNonNull(dueAt, "마감 시각은 필수입니다.");
+        validateScheduleSnapshot();
         this.createdAt = Objects.requireNonNull(createdAt, "생성 시각은 필수입니다.");
         this.publicId = UUID.randomUUID().toString();
         this.eligibilitySnapshotVersion = 1;
         this.status = OccurrenceStatus.NEEDS_ATTENTION;
+    }
+
+    private void validateScheduleSnapshot() {
+        long periodDays = ChronoUnit.DAYS.between(periodStart, periodEndExclusive);
+        long expectedDays = switch (frequencySnapshot) {
+            case DAILY -> 1;
+            case WEEKLY -> 7;
+            case BIWEEKLY -> 14;
+        };
+        if (periodDays != expectedDays) {
+            throw new IllegalArgumentException(
+                    frequencySnapshot + " 회차 기간은 " + expectedDays + "일이어야 합니다."
+            );
+        }
+
+        if (frequencySnapshot == ChoreFrequency.WEEKLY
+                && periodStart.getDayOfWeek() != chore.getGroup().getWeekStartsOn()) {
+            throw new IllegalArgumentException("주간 회차는 그룹의 주 시작 요일에 시작해야 합니다.");
+        }
+        if (frequencySnapshot == ChoreFrequency.BIWEEKLY) {
+            long daysFromAnchor = ChronoUnit.DAYS.between(
+                    chore.getBiweeklyAnchorDate(),
+                    periodStart
+            );
+            if (Math.floorMod(daysFromAnchor, 14) != 0) {
+                throw new IllegalArgumentException("격주 회차는 기준일의 14일 경계에 시작해야 합니다.");
+            }
+        }
+
+        ZoneId zoneId = ZoneId.of(timeZoneIdSnapshot);
+        LocalDate expectedDueDate = switch (frequencySnapshot) {
+            case DAILY -> periodStart;
+            case BIWEEKLY -> periodEndExclusive.minusDays(1);
+            case WEEKLY -> periodStart.plusDays(Math.floorMod(
+                    chore.getWeeklyDueDay().getValue()
+                            - chore.getGroup().getWeekStartsOn().getValue(),
+                    7
+            ));
+        };
+        Instant expectedDueAt = expectedDueDate
+                .atTime(chore.getDueTime())
+                .atZone(zoneId)
+                .toInstant();
+        if (!dueAt.equals(expectedDueAt)) {
+            throw new IllegalArgumentException("마감 시각이 업무 반복 규칙과 일치하지 않습니다.");
+        }
     }
 
     public static ChoreOccurrence create(
@@ -147,8 +206,29 @@ public class ChoreOccurrence {
         if (!required.isActive()) {
             throw new IllegalArgumentException("이미 종료된 배정 시도는 현재 배정으로 지정할 수 없습니다.");
         }
+        validateDecisionTime(required.getAssignedAt());
         this.currentAssignment = required;
         this.status = OccurrenceStatus.ASSIGNED;
+        this.attentionReason = null;
+        this.attentionSince = null;
+        this.lastDecisionAt = required.getAssignedAt();
+    }
+
+    public void recordNoCandidate(NoCandidateReason reason, Instant decidedAt) {
+        if (status != OccurrenceStatus.NEEDS_ATTENTION || currentAssignment != null) {
+            throw new IllegalStateException("관리 필요 상태이고 현재 담당자가 없을 때만 후보 없음 결정을 기록할 수 있습니다.");
+        }
+        NoCandidateReason requiredReason =
+                Objects.requireNonNull(reason, "후보 없음 사유는 필수입니다.");
+        Instant effectiveDecidedAt =
+                Objects.requireNonNull(decidedAt, "결정 시각은 필수입니다.");
+        validateDecisionTime(effectiveDecidedAt);
+
+        this.attentionReason = requiredReason;
+        if (attentionSince == null) {
+            this.attentionSince = effectiveDecidedAt;
+        }
+        this.lastDecisionAt = effectiveDecidedAt;
     }
 
     public void complete(Instant completedAt) {
@@ -191,6 +271,15 @@ public class ChoreOccurrence {
     private void requireAssigned() {
         if (status != OccurrenceStatus.ASSIGNED || currentAssignment == null) {
             throw new IllegalStateException("현재 담당자가 있는 배정 상태에서만 처리할 수 있습니다.");
+        }
+    }
+
+    private void validateDecisionTime(Instant decidedAt) {
+        if (decidedAt.isBefore(createdAt)) {
+            throw new IllegalArgumentException("결정 시각은 회차 생성 시각보다 빠를 수 없습니다.");
+        }
+        if (lastDecisionAt != null && decidedAt.isBefore(lastDecisionAt)) {
+            throw new IllegalArgumentException("결정 시각은 이전 결정 시각보다 빠를 수 없습니다.");
         }
     }
 }

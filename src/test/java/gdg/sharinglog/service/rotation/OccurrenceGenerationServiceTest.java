@@ -15,6 +15,7 @@ import gdg.sharinglog.domain.rotation.Chore;
 import gdg.sharinglog.domain.rotation.ChoreEligibleMember;
 import gdg.sharinglog.domain.rotation.ChoreEligibilityMode;
 import gdg.sharinglog.domain.rotation.ChoreOccurrence;
+import gdg.sharinglog.domain.rotation.NoCandidateReason;
 import gdg.sharinglog.domain.rotation.OccurrenceStatus;
 import gdg.sharinglog.repository.GroupMemberRepository;
 import gdg.sharinglog.repository.SharingGroupRepository;
@@ -23,6 +24,7 @@ import gdg.sharinglog.repository.rotation.ChoreAssignmentAttemptRepository;
 import gdg.sharinglog.repository.rotation.ChoreEligibleMemberRepository;
 import gdg.sharinglog.repository.rotation.ChoreOccurrenceRepository;
 import gdg.sharinglog.repository.rotation.ChoreRepository;
+import gdg.sharinglog.repository.rotation.RotationDecisionLogRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -56,6 +58,9 @@ class OccurrenceGenerationServiceTest {
     @Autowired
     ChoreAssignmentAttemptRepository assignmentRepository;
 
+    @Autowired
+    RotationDecisionLogRepository decisionLogRepository;
+
     @Test
     void createsAndAssignsCurrentOccurrenceIdempotently() {
         Context context = context("all-active");
@@ -75,6 +80,7 @@ class OccurrenceGenerationServiceTest {
         assertSame(first, second);
         assertEquals(1, occurrenceRepository.count());
         assertEquals(1, assignmentRepository.count());
+        assertEquals(1, decisionLogRepository.count());
         assertEquals(OccurrenceStatus.ASSIGNED, first.getStatus());
         assertEquals(
                 context.ownerMembership().getId(),
@@ -99,10 +105,9 @@ class OccurrenceGenerationServiceTest {
         ));
         choreEligibleMemberRepository.save(new ChoreEligibleMember(chore, selected));
 
-        ChoreOccurrence occurrence = generationService.ensureCurrentOccurrence(
-                chore.getId(),
-                Instant.parse("2026-07-23T03:00:00Z")
-        );
+        Instant reference = Instant.parse("2026-07-23T03:00:00Z");
+        ChoreOccurrence occurrence =
+                generationService.ensureCurrentOccurrence(chore.getId(), reference);
 
         assertEquals(OccurrenceStatus.ASSIGNED, occurrence.getStatus());
         assertEquals(selected.getId(), occurrence.currentAssignee().orElseThrow().getId());
@@ -127,14 +132,24 @@ class OccurrenceGenerationServiceTest {
                 Instant.parse("2026-07-23T00:00:00Z")
         ));
 
-        ChoreOccurrence occurrence = generationService.ensureCurrentOccurrence(
-                chore.getId(),
-                Instant.parse("2026-07-23T03:00:00Z")
-        );
+        Instant reference = Instant.parse("2026-07-23T03:00:00Z");
+        ChoreOccurrence occurrence =
+                generationService.ensureCurrentOccurrence(chore.getId(), reference);
 
         assertEquals(OccurrenceStatus.NEEDS_ATTENTION, occurrence.getStatus());
         assertTrue(occurrence.currentAssignee().isEmpty());
         assertEquals(0, assignmentRepository.count());
+        assertEquals(1, decisionLogRepository.count());
+        assertEquals(
+                "NO_CANDIDATE",
+                decisionLogRepository.findAll().getFirst().getOutcome().name()
+        );
+        assertEquals(
+                NoCandidateReason.NO_ACTIVE_ELIGIBLE_NON_DECLINED_CANDIDATE,
+                occurrence.getAttentionReason()
+        );
+        assertEquals(reference, occurrence.getAttentionSince());
+        assertEquals(reference, occurrence.getLastDecisionAt());
     }
 
     private Context context(String suffix) {

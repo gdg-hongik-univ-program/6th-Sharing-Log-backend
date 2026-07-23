@@ -69,11 +69,12 @@ class GroupInvitationApiTest {
     @Autowired
     InvitationCodeHasher codeHasher;
 
+    private User owner;
     private SharingGroup group;
 
     @BeforeEach
     void setUpGroup() {
-        User owner = userRepository.save(User.builder()
+        owner = userRepository.save(User.builder()
                 .provider(OAuthProvider.GOOGLE)
                 .providerUserId(OWNER_PROVIDER_ID)
                 .email("invitation-owner@example.com")
@@ -153,6 +154,22 @@ class GroupInvitationApiTest {
         mockMvc.perform(post("/api/groups/{groupId}/invitations", group.getId())
                         .with(csrf())
                         .with(oauthUser(NON_MEMBER_PROVIDER_ID)))
+                .andExpect(status().isForbidden());
+
+        assertTrue(invitationRepository.findAll().isEmpty());
+    }
+
+    @Test
+    void leftOwnerCannotIssueInvitation() throws Exception {
+        GroupMember ownerMembership = groupMemberRepository
+                .findByGroup_IdAndUser_Id(group.getId(), owner.getId())
+                .orElseThrow();
+        ownerMembership.leave(Instant.now());
+        groupMemberRepository.saveAndFlush(ownerMembership);
+
+        mockMvc.perform(post("/api/groups/{groupId}/invitations", group.getId())
+                        .with(csrf())
+                        .with(oauthUser(OWNER_PROVIDER_ID)))
                 .andExpect(status().isForbidden());
 
         assertTrue(invitationRepository.findAll().isEmpty());

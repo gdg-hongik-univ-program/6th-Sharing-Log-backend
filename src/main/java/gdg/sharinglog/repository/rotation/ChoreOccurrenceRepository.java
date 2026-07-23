@@ -18,10 +18,29 @@ public interface ChoreOccurrenceRepository extends JpaRepository<ChoreOccurrence
     @EntityGraph(attributePaths = {"chore", "currentAssignment", "currentAssignment.assignee"})
     Optional<ChoreOccurrence> findByPublicId(String publicId);
 
+    @Query("""
+            select occurrence.chore.group.id
+            from ChoreOccurrence occurrence
+            where occurrence.publicId = :publicId
+            """)
+    Optional<Long> findGroupIdByPublicId(@Param("publicId") String publicId);
+
+    @Query("""
+            select occurrence.chore.group.id
+            from ChoreOccurrence occurrence
+            where occurrence.id = :occurrenceId
+            """)
+    Optional<Long> findGroupIdById(@Param("occurrenceId") Long occurrenceId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @EntityGraph(attributePaths = {"chore", "currentAssignment", "currentAssignment.assignee"})
     @Query("select occurrence from ChoreOccurrence occurrence where occurrence.publicId = :publicId")
     Optional<ChoreOccurrence> findByPublicIdForUpdate(@Param("publicId") String publicId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = {"chore", "currentAssignment", "currentAssignment.assignee"})
+    @Query("select occurrence from ChoreOccurrence occurrence where occurrence.id = :occurrenceId")
+    Optional<ChoreOccurrence> findByIdForUpdate(@Param("occurrenceId") Long occurrenceId);
 
     Optional<ChoreOccurrence> findByChore_IdAndPeriodStart(Long choreId, LocalDate periodStart);
 
@@ -33,7 +52,7 @@ public interface ChoreOccurrenceRepository extends JpaRepository<ChoreOccurrence
 
     @EntityGraph(attributePaths = {"chore", "currentAssignment", "currentAssignment.assignee"})
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    List<ChoreOccurrence> findAllByCurrentAssignment_Assignee_IdAndStatus(
+    List<ChoreOccurrence> findAllByCurrentAssignment_Assignee_IdAndStatusOrderByIdAsc(
             Long membershipId,
             OccurrenceStatus status
     );

@@ -66,7 +66,7 @@ class ChoreOccurrenceScheduleResolverTest {
     }
 
     @Test
-    void resolvesBiweeklyDueAtAnchorOfCurrentBlock() {
+    void resolvesBiweeklyDueAtLastLocalDateOfCurrentBlock() {
         Context context = context("Asia/Seoul", DayOfWeek.MONDAY);
         Chore chore = Chore.biweekly(
                 context.group(),
@@ -85,7 +85,7 @@ class ChoreOccurrenceScheduleResolverTest {
 
         assertEquals(LocalDate.of(2026, 7, 13), schedule.periodStart());
         assertEquals(LocalDate.of(2026, 7, 27), schedule.periodEndExclusive());
-        assertEquals(Instant.parse("2026-07-13T11:00:00Z"), schedule.dueAt());
+        assertEquals(Instant.parse("2026-07-26T11:00:00Z"), schedule.dueAt());
     }
 
     private Context context(String zoneId, DayOfWeek weekStart) {

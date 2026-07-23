@@ -44,7 +44,8 @@ public class ChoreOccurrenceScheduleResolver {
 
     private LocalDate dueDate(Chore chore, RecurrencePeriod period) {
         return switch (chore.getFrequency()) {
-            case DAILY, BIWEEKLY -> period.periodStart();
+            case DAILY -> period.periodStart();
+            case BIWEEKLY -> period.periodEndExclusive().minusDays(1);
             case WEEKLY -> {
                 int dayOffset = Math.floorMod(
                         chore.getWeeklyDueDay().getValue()

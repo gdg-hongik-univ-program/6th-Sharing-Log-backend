@@ -16,10 +16,20 @@ public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> 
 
     Optional<GroupMember> findByGroup_IdAndUser_Id(Long groupId, Long userId);
 
+    Optional<GroupMember> findByGroup_IdAndUser_IdAndStatus(
+            Long groupId,
+            Long userId,
+            MemberStatus status
+    );
+
     @EntityGraph(attributePaths = "user")
     List<GroupMember> findAllByGroup_Id(Long groupId);
 
+    @EntityGraph(attributePaths = "user")
     List<GroupMember> findAllByGroup_IdAndStatusOrderById(Long groupId, MemberStatus status);
+
+    @Query("select member.group.id from GroupMember member where member.publicId = :publicId")
+    Optional<Long> findGroupIdByPublicId(@Param("publicId") String publicId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select member from GroupMember member where member.publicId = :publicId")

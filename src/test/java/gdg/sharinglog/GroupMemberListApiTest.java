@@ -14,6 +14,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Instant;
+
 import gdg.sharinglog.domain.GroupMember;
 import gdg.sharinglog.domain.OAuthProvider;
 import gdg.sharinglog.domain.SharingGroup;
@@ -108,6 +110,28 @@ class GroupMemberListApiTest {
     }
 
     @Test
+    void leftMembersAreExcludedFromMemberList() throws Exception {
+        leaveMember();
+
+        mockMvc.perform(get("/api/groups/{groupId}/members", group.getId())
+                        .with(oauthUser(OWNER_PROVIDER_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.members", hasSize(1)))
+                .andExpect(jsonPath("$.members[0].role").value("OWNER"))
+                .andExpect(jsonPath("$.members[0].me").value(true));
+    }
+
+    @Test
+    void leftMemberCannotListGroupMembers() throws Exception {
+        leaveMember();
+
+        mockMvc.perform(get("/api/groups/{groupId}/members", group.getId())
+                        .with(oauthUser(MEMBER_PROVIDER_ID)))
+                .andExpect(status().isForbidden())
+                .andExpect(content().string(not(containsString("owner@example.com"))));
+    }
+
+    @Test
     void nonMemberCannotListMembers() throws Exception {
         mockMvc.perform(get("/api/groups/{groupId}/members", group.getId())
                         .with(oauthUser(OUTSIDER_PROVIDER_ID)))
@@ -134,6 +158,14 @@ class GroupMemberListApiTest {
         mockMvc.perform(get("/api/groups/{groupId}/members", group.getId()))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(header().string("Location", endsWith("/login")));
+    }
+
+    private void leaveMember() {
+        GroupMember membership = groupMemberRepository
+                .findByGroup_IdAndUser_Id(group.getId(), member.getId())
+                .orElseThrow();
+        membership.leave(Instant.now());
+        groupMemberRepository.saveAndFlush(membership);
     }
 
     private User saveUser(String providerUserId, String email) {

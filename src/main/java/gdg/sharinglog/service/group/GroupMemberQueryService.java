@@ -5,6 +5,7 @@ import java.util.List;
 
 import gdg.sharinglog.domain.GroupMember;
 import gdg.sharinglog.domain.GroupRole;
+import gdg.sharinglog.domain.MemberStatus;
 import gdg.sharinglog.domain.SharingGroup;
 import gdg.sharinglog.domain.User;
 import gdg.sharinglog.repository.GroupMemberRepository;
@@ -43,11 +44,15 @@ public class GroupMemberQueryService {
         SharingGroup group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new GroupNotFoundException(groupId));
         GroupMember requesterMembership = groupMemberRepository
-                .findByGroup_IdAndUser_Id(groupId, requester.getId())
+                .findByGroup_IdAndUser_IdAndStatus(
+                        groupId,
+                        requester.getId(),
+                        MemberStatus.ACTIVE
+                )
                 .orElseThrow(GroupMemberAccessDeniedException::new);
 
         List<GroupMembers.Member> members = groupMemberRepository
-                .findAllByGroup_Id(groupId)
+                .findAllByGroup_IdAndStatusOrderById(groupId, MemberStatus.ACTIVE)
                 .stream()
                 .sorted(MEMBER_ORDER)
                 .map(membership -> toMember(membership, requester.getId()))

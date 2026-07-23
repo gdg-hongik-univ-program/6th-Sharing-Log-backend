@@ -117,6 +117,121 @@ class ChoreOccurrenceStateMachineTest {
         );
     }
 
+    @Test
+    void recordsNoCandidateAttentionAndPreservesOriginalSinceAcrossRetries() {
+        Instant firstDecisionAt = instant("2026-07-22T16:00:00Z");
+        Instant retryDecisionAt = instant("2026-07-22T17:00:00Z");
+
+        assertNull(occurrence.getAttentionReason());
+        assertNull(occurrence.getAttentionSince());
+        assertNull(occurrence.getLastDecisionAt());
+
+        occurrence.recordNoCandidate(
+                NoCandidateReason.NO_ACTIVE_ELIGIBLE_NON_DECLINED_CANDIDATE,
+                firstDecisionAt
+        );
+        occurrence.recordNoCandidate(
+                NoCandidateReason.NO_ACTIVE_ELIGIBLE_NON_DECLINED_CANDIDATE,
+                retryDecisionAt
+        );
+
+        assertEquals(
+                NoCandidateReason.NO_ACTIVE_ELIGIBLE_NON_DECLINED_CANDIDATE,
+                occurrence.getAttentionReason()
+        );
+        assertEquals(firstDecisionAt, occurrence.getAttentionSince());
+        assertEquals(retryDecisionAt, occurrence.getLastDecisionAt());
+        assertEquals(OccurrenceStatus.NEEDS_ATTENTION, occurrence.getStatus());
+    }
+
+    @Test
+    void successfulAssignmentClearsAttentionAndRecordsLastDecisionTime() {
+        occurrence.recordNoCandidate(
+                NoCandidateReason.NO_ACTIVE_ELIGIBLE_NON_DECLINED_CANDIDATE,
+                instant("2026-07-22T16:00:00Z")
+        );
+        ChoreAssignmentAttempt assignment =
+                assignment(firstMember, 1, AssignmentTrigger.NEEDS_ATTENTION_RETRY);
+
+        occurrence.assign(assignment);
+
+        assertEquals(OccurrenceStatus.ASSIGNED, occurrence.getStatus());
+        assertNull(occurrence.getAttentionReason());
+        assertNull(occurrence.getAttentionSince());
+        assertEquals(assignment.getAssignedAt(), occurrence.getLastDecisionAt());
+    }
+
+    @Test
+    void rejectsNoCandidateDecisionUnlessOccurrenceNeedsAttention() {
+        occurrence.assign(assignment(firstMember, 1, AssignmentTrigger.INITIAL));
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> occurrence.recordNoCandidate(
+                        NoCandidateReason.NO_ACTIVE_ELIGIBLE_NON_DECLINED_CANDIDATE,
+                        instant("2026-07-23T01:00:00Z")
+                )
+        );
+    }
+
+    @Test
+    void rejectsDecisionOlderThanPreviousDecision() {
+        occurrence.recordNoCandidate(
+                NoCandidateReason.NO_ACTIVE_ELIGIBLE_NON_DECLINED_CANDIDATE,
+                instant("2026-07-22T17:00:00Z")
+        );
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> occurrence.recordNoCandidate(
+                        NoCandidateReason.NO_ACTIVE_ELIGIBLE_NON_DECLINED_CANDIDATE,
+                        instant("2026-07-22T16:00:00Z")
+                )
+        );
+    }
+
+    @Test
+    void rejectsPeriodLengthThatDoesNotMatchFrequency() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> ChoreOccurrence.create(
+                        chore,
+                        LocalDate.of(2026, 7, 23),
+                        LocalDate.of(2026, 8, 6),
+                        instant("2026-07-23T12:00:00Z"),
+                        instant("2026-07-22T15:00:00Z")
+                )
+        );
+    }
+
+    @Test
+    void rejectsDueDateOutsideConfiguredDailyDate() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> ChoreOccurrence.create(
+                        chore,
+                        LocalDate.of(2026, 7, 23),
+                        LocalDate.of(2026, 7, 24),
+                        instant("2026-07-24T12:00:00Z"),
+                        instant("2026-07-22T15:00:00Z")
+                )
+        );
+    }
+
+    @Test
+    void rejectsDifferentDueTimeEvenOnConfiguredDailyDate() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> ChoreOccurrence.create(
+                        chore,
+                        LocalDate.of(2026, 7, 23),
+                        LocalDate.of(2026, 7, 24),
+                        instant("2026-07-23T11:00:00Z"),
+                        instant("2026-07-22T15:00:00Z")
+                )
+        );
+    }
+
     private ChoreAssignmentAttempt assignment(
             GroupMember member,
             int sequence,

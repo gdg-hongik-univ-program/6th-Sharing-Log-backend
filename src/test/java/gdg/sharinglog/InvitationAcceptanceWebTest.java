@@ -4,6 +4,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oauth2Login;
@@ -19,6 +20,7 @@ import java.time.Instant;
 import gdg.sharinglog.domain.GroupInvitation;
 import gdg.sharinglog.domain.GroupMember;
 import gdg.sharinglog.domain.GroupRole;
+import gdg.sharinglog.domain.MemberStatus;
 import gdg.sharinglog.domain.OAuthProvider;
 import gdg.sharinglog.domain.SharingGroup;
 import gdg.sharinglog.domain.User;
@@ -182,6 +184,53 @@ class InvitationAcceptanceWebTest {
     void acceptingTwiceDoesNotCreateDuplicateMembership() throws Exception {
         acceptAs(INVITEE_PROVIDER_ID, "joined");
         acceptAs(INVITEE_PROVIDER_ID, "already-member");
+
+        long matchingMemberships = groupMemberRepository.findAll().stream()
+                .filter(member -> member.getGroup().getId().equals(group.getId()))
+                .filter(member -> member.getUser().getId().equals(invitee.getId()))
+                .count();
+        assertEquals(1, matchingMemberships);
+    }
+
+    @Test
+    void leftMembershipIsJoinableAndReactivatedWithoutCreatingDuplicate() throws Exception {
+        GroupMember leftMembership = groupMemberRepository.save(
+                GroupMember.member(group, invitee)
+        );
+        Long membershipId = leftMembership.getId();
+        String membershipPublicId = leftMembership.getPublicId();
+        Instant leftAt = Instant.now().minusSeconds(60);
+        leftMembership.leave(leftAt);
+        groupMemberRepository.saveAndFlush(leftMembership);
+
+        mockMvc.perform(get("/api/invitations/{code}", INVITATION_CODE)
+                        .with(oauthUser(INVITEE_PROVIDER_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.alreadyMember").value(false));
+
+        mockMvc.perform(get("/invite/{code}", INVITATION_CODE)
+                        .with(oauthUser(INVITEE_PROVIDER_ID)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString(
+                        "id=\"accept-invitation-button\"")));
+
+        Instant beforeAcceptance = Instant.now();
+        mockMvc.perform(post("/api/invitations/{code}/accept", INVITATION_CODE)
+                        .with(csrf())
+                        .with(oauthUser(INVITEE_PROVIDER_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.membershipId").value(membershipId))
+                .andExpect(jsonPath("$.role").value("MEMBER"))
+                .andExpect(jsonPath("$.joinedNow").value(true));
+
+        GroupMember reactivated = groupMemberRepository
+                .findByGroup_IdAndUser_Id(group.getId(), invitee.getId())
+                .orElseThrow();
+        assertEquals(membershipId, reactivated.getId());
+        assertEquals(membershipPublicId, reactivated.getPublicId());
+        assertEquals(MemberStatus.ACTIVE, reactivated.getStatus());
+        assertNull(reactivated.getLeftAt());
+        assertTrue(!reactivated.getJoinedAt().isBefore(beforeAcceptance));
 
         long matchingMemberships = groupMemberRepository.findAll().stream()
                 .filter(member -> member.getGroup().getId().equals(group.getId()))
