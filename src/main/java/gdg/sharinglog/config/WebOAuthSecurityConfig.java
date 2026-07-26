@@ -1,6 +1,7 @@
 package gdg.sharinglog.config;
 
 import gdg.sharinglog.config.oauth.OAuth2UserCustomService;
+import gdg.sharinglog.config.oauth.OAuth2SuccessHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
@@ -11,23 +12,36 @@ import org.springframework.security.web.SecurityFilterChain;
 public class WebOAuthSecurityConfig {
 
     private final OAuth2UserCustomService oAuth2UserCustomService;
+    private final OAuth2SuccessHandler oAuth2SuccessHandler;
 
-    public WebOAuthSecurityConfig(OAuth2UserCustomService oAuth2UserCustomService) {
+    public WebOAuthSecurityConfig(OAuth2UserCustomService oAuth2UserCustomService,
+                                  OAuth2SuccessHandler oAuth2SuccessHandler) {
         this.oAuth2UserCustomService = oAuth2UserCustomService;
+        this.oAuth2SuccessHandler = oAuth2SuccessHandler;
     }
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         return http
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/", "/login", "/css/**", "/img/**", "/js/**", "/favicon.ico").permitAll()
+                        .requestMatchers(
+                                "/",
+                                "/login",
+                                "/css/**",
+                                "/img/**",
+                                "/js/**",
+                                "/favicon.ico",
+                                "/swagger-ui.html",
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**"
+                        ).permitAll()
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2 -> oauth2
                         .loginPage("/login")
                         .userInfoEndpoint(userInfo -> userInfo
                                 .userService(oAuth2UserCustomService))
-                        .defaultSuccessUrl("/", true)
+                        .successHandler(oAuth2SuccessHandler)
                 )
 
                 // 해당 요청만 CSRF 예외 처리하고

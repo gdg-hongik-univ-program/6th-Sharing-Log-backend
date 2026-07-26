@@ -12,7 +12,13 @@ import org.springframework.security.core.userdetails.UserDetails;
 import java.util.Collection;
 import java.util.List;
 
-@Table(name = "users")
+@Table(
+        name = "users",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_users_provider_user_id",
+                columnNames = {"provider", "provider_user_id"}
+        )
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Getter
 @Entity
@@ -22,17 +28,27 @@ public class User implements UserDetails {
     @Column(name = "id", updatable = false)
     private Long id;
 
-    @Column(name = "email", nullable = false, unique = true)
+    @Enumerated(EnumType.STRING)
+    @Column(name = "provider", nullable = false, length = 20)
+    private OAuthProvider provider;
+
+    @Column(name = "provider_user_id", nullable = false)
+    private String providerUserId;
+
+    @Column(name = "email")
     private String email;
 
     @Column(name = "password")
     private String password;
 
-    @Column(name = "nickname", unique = true)
+    @Column(name = "nickname")
     private String nickname;
 
     @Builder
-    public User(String email, String password, String nickname) {
+    public User(OAuthProvider provider, String providerUserId, String email,
+                String password, String nickname) {
+        this.provider = provider;
+        this.providerUserId = providerUserId;
         this.email = email;
         this.password = password;
         this.nickname = nickname;
@@ -45,7 +61,7 @@ public class User implements UserDetails {
 
     @Override
     public String getUsername() {
-        return email;
+        return provider.name().toLowerCase() + ":" + providerUserId;
     }
 
     @Override
@@ -74,6 +90,11 @@ public class User implements UserDetails {
 
     public User update(String nickname) {
         this.nickname = nickname;
+        return this;
+    }
+
+    public User updateOAuthProfile(String email) {
+        this.email = email;
         return this;
     }
 }
