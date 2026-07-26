@@ -19,12 +19,14 @@ import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
 
 class OAuth2SuccessHandlerTest {
 
+    private static final String SUCCESS_URL = "http://localhost:5173/house-choice";
+
     @Test
     void persistsAuthenticatedOAuth2UserBeforeRedirect() throws Exception {
         OAuth2UserPersistenceService persistenceService = mock(OAuth2UserPersistenceService.class);
         OAuth2SuccessHandler successHandler = new OAuth2SuccessHandler(
                 persistenceService,
-                "http://localhost:5173/"
+                SUCCESS_URL
         );
         OAuth2User principal = new DefaultOAuth2User(
                 Set.of(new SimpleGrantedAuthority("ROLE_USER")),
@@ -42,7 +44,7 @@ class OAuth2SuccessHandlerTest {
         successHandler.onAuthenticationSuccess(request, response, authentication);
 
         verify(persistenceService).saveOrUpdate("naver", principal);
-        assertEquals("http://localhost:5173/house-choice", response.getRedirectedUrl());
+        assertEquals(SUCCESS_URL, response.getRedirectedUrl());
     }
 
     @Test
@@ -50,7 +52,7 @@ class OAuth2SuccessHandlerTest {
         OAuth2UserPersistenceService persistenceService = mock(OAuth2UserPersistenceService.class);
         OAuth2SuccessHandler successHandler = new OAuth2SuccessHandler(
                 persistenceService,
-                "http://localhost:5173"
+                SUCCESS_URL
         );
         OAuth2User principal = new DefaultOAuth2User(
                 Set.of(new SimpleGrantedAuthority("ROLE_USER")),
@@ -76,6 +78,6 @@ class OAuth2SuccessHandlerTest {
         successHandler.onAuthenticationSuccess(callbackRequest, response, authentication);
 
         verify(persistenceService).saveOrUpdate("google", principal);
-        assertEquals("http://localhost:5173/house-choice", response.getRedirectedUrl());
+        assertEquals(SUCCESS_URL, response.getRedirectedUrl());
     }
 }

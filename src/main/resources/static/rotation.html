@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>업무 로테이션 · Sharing Log</title>
+    <link rel="stylesheet" href="/css/app.css">
+    <script src="/js/rotation.js" defer></script>
+</head>
+<body class="rotation-page">
+<main class="rotation-shell">
+    <header class="rotation-header">
+        <div>
+            <p class="eyebrow">Sharing Log</p>
+            <h1>업무 로테이션</h1>
+            <p class="copy">공정성 점수가 같은 후보 사이에서만 무작위로 담당자를 정해요.</p>
+        </div>
+        <button id="open-create-chore" class="primary-button" type="button">업무 추가</button>
+    </header>
+
+    <nav class="rotation-tabs" aria-label="반복 주기">
+        <button class="rotation-tab is-active" data-frequency="DAILY" type="button">매일</button>
+        <button class="rotation-tab" data-frequency="WEEKLY" type="button">매주</button>
+        <button class="rotation-tab" data-frequency="BIWEEKLY" type="button">격주</button>
+    </nav>
+
+    <p id="rotation-status" class="rotation-status" role="status" aria-live="polite"></p>
+    <section id="occurrence-list" class="occurrence-grid"></section>
+
+    <dialog id="create-chore-dialog" class="rotation-dialog">
+        <form id="create-chore-form">
+            <div class="dialog-heading">
+                <div>
+                    <p class="eyebrow">NEW CHORE</p>
+                    <h2>새 업무 만들기</h2>
+                </div>
+                <button id="close-create-chore" class="icon-button" type="button" aria-label="닫기">×</button>
+            </div>
+            <label>업무 이름
+                <input id="chore-name" maxlength="100" required>
+            </label>
+            <label>반복
+                <select id="chore-frequency">
+                    <option value="DAILY">매일</option>
+                    <option value="WEEKLY">매주</option>
+                    <option value="BIWEEKLY">격주</option>
+                </select>
+            </label>
+            <label>마감 시각
+                <input id="chore-due-time" type="time" value="20:00" required>
+            </label>
+            <label id="weekly-day-field" hidden>마감 요일
+                <select id="chore-weekly-day">
+                    <option value="MONDAY">월요일</option>
+                    <option value="TUESDAY">화요일</option>
+                    <option value="WEDNESDAY">수요일</option>
+                    <option value="THURSDAY">목요일</option>
+                    <option value="FRIDAY">금요일</option>
+                    <option value="SATURDAY">토요일</option>
+                    <option value="SUNDAY" selected>일요일</option>
+                </select>
+            </label>
+            <label id="biweekly-anchor-field" hidden>격주 시작일
+                <input id="chore-biweekly-anchor" type="date">
+            </label>
+            <label>담당 가능 멤버
+                <select id="chore-eligibility-mode">
+                    <option value="ALL_ACTIVE_MEMBERS">모든 활성 멤버</option>
+                    <option value="SELECTED_MEMBERS">지정 멤버만</option>
+                </select>
+            </label>
+            <fieldset id="selected-members-field" hidden>
+                <legend>지정 멤버</legend>
+                <div id="eligible-member-list">멤버를 불러오는 중...</div>
+            </fieldset>
+            <button class="primary-button full-button" type="submit">생성하고 자동 배정</button>
+            <p id="create-chore-status" class="rotation-status" role="status"></p>
+        </form>
+    </dialog>
+</main>
+</body>
+</html>

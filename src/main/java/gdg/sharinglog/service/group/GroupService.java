@@ -38,8 +38,10 @@ public class GroupService {
 
         return new CreatedGroup(
                 group.getId(),
+                group.getPublicId(),
                 group.getName(),
                 ownerMembership.getId(),
+                ownerMembership.getPublicId(),
                 ownerMembership.getRole(),
                 group.getCreatedAt()
         );

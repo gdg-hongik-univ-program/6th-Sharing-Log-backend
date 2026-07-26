@@ -19,27 +19,35 @@ public class OAuth2SuccessHandler
 
     public OAuth2SuccessHandler(
             OAuth2UserPersistenceService userPersistenceService,
-            @Value("${app.frontend-base-url:http://localhost:5173}")
-            String frontendBaseUrl
+            @Value("${app.oauth2-success-url:/}")
+                    // app.frontend-base-url:http://localhost:5173 을
+                    // 다음과 같이 설정
+                    // app.oauth2-success-url:/
+
+            String successUrl
+                    // frontendBaseUrl 을 successUrl 로
     ) {
         this.userPersistenceService = userPersistenceService;
 
+        /* 주석처리로
         String normalizedFrontendUrl =
                 frontendBaseUrl.replaceFirst("/+$", "");
+        */
 
         // Google 로그인 성공 후 React 하우스 선택 화면으로 이동
-        setDefaultTargetUrl(
-                normalizedFrontendUrl + "/house-choice"
-        );
+        // normalizedFrontendUrl + "/house-choice" 을 successUrl로
+        setDefaultTargetUrl(successUrl);
 
-        // 과거에 저장된 백엔드 주소 대신 위 React 주소를 항상 사용
-        // ** 초대 코드로 들어왔다가 로그인하는 경우에는 초대 코드가 사라질 수 있음
+
+
+        // 로그인 성공 후 이전 요청 주소를 무시하고
+        // React 프론트엔드의 그룹 선택 화면으로 항상 이동
+        // 초대 링크의 코드가 이전 요청 URL에만 포함되어 있다면
+        // 이 과정에서 코드가 유지되지 않을 수 있다.
         setAlwaysUseDefaultTargetUrl(true);
-        // 과거의 요청 주소를 무시하고 위 주소를 항상 사용(프론트엔드)
-        // 프런트가 실행되지 않은 환경에서 테스트하려면
-        // 백엔드 단독 테스트용으론
-        // (true) 부분을
-        // 주소를 /로 설정
+
+        // 백엔드만 단독으로 테스트할 때는 frontendBaseUrl을 백엔드 주소로 변경하고,
+        // 기본 이동 경로도 "/house-choice" 대신 "/" 등 테스트용 경로로 수정해야 한다.
 
     }
 

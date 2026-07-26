@@ -15,6 +15,7 @@
     const memberGroupIdInput = document.querySelector("#member-group-id");
     const loadMembersButton = document.querySelector("#load-members-button");
     const memberListResult = document.querySelector("#member-list-result");
+    const rotationLink = document.querySelector("#rotation-link");
 
     let createdGroupId = null;
 
@@ -41,10 +42,14 @@
             groupResult.textContent = [
                 "그룹 생성 완료",
                 `그룹 ID: ${group.groupId}`,
+                `로테이션 그룹 ID: ${group.groupPublicId}`,
                 `그룹 이름: ${group.name}`,
                 `내 역할: ${group.role}`,
-                `멤버십 ID: ${group.membershipId}`
+                `멤버십 ID: ${group.membershipId}`,
+                `로테이션 멤버십 ID: ${group.membershipPublicId}`
             ].join("\n");
+            rotationLink.href = `/rotation.html?groupId=${encodeURIComponent(group.groupPublicId)}`;
+            rotationLink.hidden = false;
             issueInvitationButton.disabled = false;
             memberGroupIdInput.value = String(group.groupId);
             void loadMembers(group.groupId);

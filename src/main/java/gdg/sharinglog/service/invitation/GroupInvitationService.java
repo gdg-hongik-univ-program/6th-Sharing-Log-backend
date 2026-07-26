@@ -6,6 +6,7 @@ import java.time.Instant;
 import gdg.sharinglog.domain.GroupInvitation;
 import gdg.sharinglog.domain.GroupMember;
 import gdg.sharinglog.domain.GroupRole;
+import gdg.sharinglog.domain.MemberStatus;
 import gdg.sharinglog.domain.SharingGroup;
 import gdg.sharinglog.domain.User;
 import gdg.sharinglog.repository.GroupInvitationRepository;
@@ -52,7 +53,11 @@ public class GroupInvitationService {
         SharingGroup group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new GroupNotFoundException(groupId));
         GroupMember membership = groupMemberRepository
-                .findByGroup_IdAndUser_Id(groupId, requester.getId())
+                .findByGroup_IdAndUser_IdAndStatus(
+                        groupId,
+                        requester.getId(),
+                        MemberStatus.ACTIVE
+                )
                 .orElseThrow(InvitationPermissionDeniedException::new);
 
         if (membership.getRole() != GroupRole.OWNER) {

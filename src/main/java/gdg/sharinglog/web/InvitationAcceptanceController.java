@@ -105,10 +105,12 @@ public class InvitationAcceptanceController {
                     <p id="membership-status">%s</p>
                     <p>현재 역할: %s</p>
                     <p><a id="member-list-link" class="secondary-link" href="/?groupId=%s#group-members">멤버 목록 보기</a></p>
+                    <p><a class="secondary-link" href="/rotation.html?groupId=%s">업무 로테이션 열기</a></p>
                     """.formatted(
                     HtmlUtils.htmlEscape(message),
                     HtmlUtils.htmlEscape(preview.currentRole().name()),
-                    preview.groupId()
+                    preview.groupId(),
+                    HtmlUtils.htmlEscape(preview.groupPublicId())
             );
         } else {
             membershipContent = """

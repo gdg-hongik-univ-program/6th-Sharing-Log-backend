@@ -6,10 +6,12 @@ import java.util.regex.Pattern;
 
 import gdg.sharinglog.domain.GroupInvitation;
 import gdg.sharinglog.domain.GroupMember;
+import gdg.sharinglog.domain.MemberStatus;
 import gdg.sharinglog.domain.SharingGroup;
 import gdg.sharinglog.domain.User;
 import gdg.sharinglog.repository.GroupInvitationRepository;
 import gdg.sharinglog.repository.GroupMemberRepository;
+import gdg.sharinglog.repository.SharingGroupRepository;
 import gdg.sharinglog.service.invitation.exception.InvitationNotFoundException;
 import gdg.sharinglog.service.invitation.exception.InvitationUnavailableException;
 import gdg.sharinglog.service.invitation.result.AcceptedInvitation;
@@ -26,15 +28,18 @@ public class InvitationAcceptanceService {
 
     private final GroupInvitationRepository invitationRepository;
     private final GroupMemberRepository groupMemberRepository;
+    private final SharingGroupRepository sharingGroupRepository;
     private final InvitationCodeHasher codeHasher;
     private final AuthenticatedUserService authenticatedUserService;
 
     public InvitationAcceptanceService(GroupInvitationRepository invitationRepository,
                                        GroupMemberRepository groupMemberRepository,
+                                       SharingGroupRepository sharingGroupRepository,
                                        InvitationCodeHasher codeHasher,
                                        AuthenticatedUserService authenticatedUserService) {
         this.invitationRepository = invitationRepository;
         this.groupMemberRepository = groupMemberRepository;
+        this.sharingGroupRepository = sharingGroupRepository;
         this.codeHasher = codeHasher;
         this.authenticatedUserService = authenticatedUserService;
     }
@@ -45,10 +50,15 @@ public class InvitationAcceptanceService {
         User user = authenticatedUserService.requireUser(registrationId, oAuth2User);
         SharingGroup group = invitation.getGroup();
         Optional<GroupMember> membership = groupMemberRepository
-                .findByGroup_IdAndUser_Id(group.getId(), user.getId());
+                .findByGroup_IdAndUser_IdAndStatus(
+                        group.getId(),
+                        user.getId(),
+                        MemberStatus.ACTIVE
+                );
 
         return new InvitationPreview(
                 group.getId(),
+                group.getPublicId(),
                 group.getName(),
                 invitation.getExpiresAt(),
                 membership.isPresent(),
@@ -64,11 +74,18 @@ public class InvitationAcceptanceService {
                 .orElseThrow(InvitationNotFoundException::new);
         requireUsable(invitation, Instant.now());
 
-        SharingGroup group = invitation.getGroup();
+        SharingGroup group = sharingGroupRepository
+                .findByIdForUpdate(invitation.getGroup().getId())
+                .orElseThrow(() -> new IllegalStateException("초대의 그룹을 찾을 수 없습니다."));
         Optional<GroupMember> existingMembership = groupMemberRepository
                 .findByGroup_IdAndUser_Id(group.getId(), user.getId());
         if (existingMembership.isPresent()) {
-            return acceptance(existingMembership.get(), false);
+            GroupMember membership = existingMembership.get();
+            if (membership.isActive()) {
+                return acceptance(membership, false);
+            }
+            membership.reactivate(Instant.now());
+            return acceptance(groupMemberRepository.save(membership), true);
         }
 
         GroupMember membership = groupMemberRepository.save(GroupMember.member(group, user));
@@ -98,8 +115,10 @@ public class InvitationAcceptanceService {
     private AcceptedInvitation acceptance(GroupMember membership, boolean joinedNow) {
         return new AcceptedInvitation(
                 membership.getGroup().getId(),
+                membership.getGroup().getPublicId(),
                 membership.getGroup().getName(),
                 membership.getId(),
+                membership.getPublicId(),
                 membership.getRole(),
                 membership.getJoinedAt(),
                 joinedNow

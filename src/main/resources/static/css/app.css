@@ -120,3 +120,164 @@ h1 {
         font-size: 24px;
     }
 }
+
+.rotation-page {
+    background: #f6f8fb;
+}
+
+.rotation-shell {
+    width: min(100% - 32px, 900px);
+    margin: 0 auto;
+    padding: 32px 0;
+}
+
+.rotation-header,
+.occurrence-heading,
+.dialog-heading {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+.primary-button,
+.occurrence-actions button {
+    border: 1px solid #1a73e8;
+    border-radius: 4px;
+    padding: 10px 14px;
+    color: #fff;
+    background: #1a73e8;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.full-button {
+    width: 100%;
+}
+
+.rotation-tabs {
+    display: flex;
+    gap: 8px;
+    margin-top: 24px;
+}
+
+.rotation-tab {
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+    padding: 10px 16px;
+    background: #fff;
+    cursor: pointer;
+}
+
+.rotation-tab.is-active {
+    border-color: #1a73e8;
+    color: #1a73e8;
+    font-weight: 700;
+}
+
+.rotation-status {
+    min-height: 24px;
+    margin: 18px 0 10px;
+    color: #5f6368;
+    font-size: 14px;
+}
+
+.occurrence-grid {
+    display: grid;
+    gap: 12px;
+}
+
+.occurrence-card {
+    padding: 16px;
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+    background: #fff;
+}
+
+.occurrence-card h2,
+.rotation-dialog h2 {
+    margin: 0;
+}
+
+.occurrence-heading p,
+.assignee-line,
+.due-line,
+.attention-line {
+    margin: 6px 0 0;
+    color: #5f6368;
+    font-size: 13px;
+}
+
+.status-badge {
+    padding: 4px 8px;
+    border: 1px solid #dadce0;
+    font-size: 11px;
+}
+
+.occurrence-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.occurrence-actions button {
+    font-size: 12px;
+}
+
+.rotation-dialog {
+    width: min(100% - 32px, 500px);
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+    padding: 24px;
+}
+
+.rotation-dialog label {
+    display: grid;
+    gap: 7px;
+    margin-top: 16px;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.rotation-dialog fieldset {
+    margin: 16px 0;
+    border: 1px solid #dadce0;
+}
+
+#eligible-member-list {
+    display: grid;
+    gap: 8px;
+}
+
+#eligible-member-list label {
+    display: block;
+    margin: 0;
+    font-weight: 400;
+}
+
+.rotation-dialog input,
+.rotation-dialog select {
+    width: 100%;
+    padding: 9px;
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+    font: inherit;
+}
+
+.icon-button {
+    border: 1px solid #dadce0;
+    background: #fff;
+    font-size: 20px;
+    cursor: pointer;
+}
+
+.form-help {
+    color: #5f6368;
+    font-size: 12px;
+}
+
+@media (max-width: 600px) {
+    .rotation-header {
+        flex-direction: column;
+    }
+}
