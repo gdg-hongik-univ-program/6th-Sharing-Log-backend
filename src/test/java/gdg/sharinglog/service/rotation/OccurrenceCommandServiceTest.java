@@ -192,6 +192,7 @@ class OccurrenceCommandServiceTest {
     @Test
     void leavingAssigneeIsSoftDeletedAndOpenOccurrenceIsReassigned() {
         Context context = context("leave");
+        addBackupOwner(context, "leave");
         ChoreOccurrence occurrence = generate(context);
         GroupMember leaving = occurrence.currentAssignee().orElseThrow();
 
@@ -216,6 +217,7 @@ class OccurrenceCommandServiceTest {
     @Test
     void leavingAfterCompletionDoesNotRewriteClosedOccurrenceHistory() {
         Context context = context("leave-completed");
+        addBackupOwner(context, "leave-completed");
         ChoreOccurrence occurrence = generate(context);
         GroupMember assignee = occurrence.currentAssignee().orElseThrow();
         commandService.complete(occurrence.getPublicId(), assignee.getPublicId(), ACTION_AT);
@@ -346,6 +348,11 @@ class OccurrenceCommandServiceTest {
         GroupMember ownerMembership = groupMemberRepository.save(GroupMember.owner(group, owner));
         GroupMember membership = groupMemberRepository.save(GroupMember.member(group, member));
         return new Context(group, List.of(ownerMembership, membership));
+    }
+
+    private void addBackupOwner(Context context, String suffix) {
+        User backupOwner = userRepository.save(user("backup-owner-" + suffix));
+        groupMemberRepository.save(GroupMember.owner(context.group(), backupOwner));
     }
 
     private User user(String providerUserId) {

@@ -21,6 +21,7 @@ import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import org.hibernate.Length;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -81,7 +82,7 @@ public class IdempotencyRecord {
     private int responseStatus;
 
     @Lob
-    @Column(name = "response_body")
+    @Column(name = "response_body", length = Length.LONG32)
     private String responseBody;
 
     @Column(name = "response_etag", length = 255)

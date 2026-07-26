@@ -19,6 +19,7 @@ import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import org.hibernate.Length;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -93,7 +94,7 @@ public class ChoreAssignmentAttempt {
     private long decisionSeed;
 
     @Lob
-    @Column(name = "candidate_snapshot", nullable = false)
+    @Column(name = "candidate_snapshot", nullable = false, length = Length.LONG32)
     private String candidateSnapshot;
 
     @Column(name = "decision_summary", nullable = false, length = 500)

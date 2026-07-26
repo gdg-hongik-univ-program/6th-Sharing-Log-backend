@@ -16,7 +16,6 @@ import gdg.sharinglog.domain.User;
 import gdg.sharinglog.repository.GroupMemberRepository;
 import gdg.sharinglog.repository.SharingGroupRepository;
 import gdg.sharinglog.service.user.AuthenticatedUserService;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -62,16 +61,9 @@ class RotationActorAccessServiceTest {
     @InjectMocks
     RotationActorAccessService accessService;
 
-    @BeforeEach
-    void setUpActorEntities() {
-        when(group.getId()).thenReturn(GROUP_ID);
-        when(group.getPublicId()).thenReturn(GROUP_PUBLIC_ID);
-        when(user.getId()).thenReturn(USER_ID);
-    }
-
     @Test
     void resolvesActorFromOAuthUserAndActiveMembership() {
-        stubReadActor(GroupRole.MEMBER);
+        stubReadActor();
 
         RotationActor actor = accessService.requireActiveMember(
                 GROUP_PUBLIC_ID,
@@ -95,7 +87,7 @@ class RotationActorAccessServiceTest {
         stubAuthenticatedUser();
         when(groupRepository.findByPublicIdForUpdate(GROUP_PUBLIC_ID))
                 .thenReturn(Optional.of(group));
-        stubActiveMembership(GroupRole.MEMBER);
+        stubActiveMembership();
 
         RotationActor actor = accessService.requireActiveMemberForUpdate(
                 GROUP_PUBLIC_ID,
@@ -112,6 +104,7 @@ class RotationActorAccessServiceTest {
     void leftMemberCannotAct() {
         stubAuthenticatedUser();
         when(groupRepository.findByPublicId(GROUP_PUBLIC_ID)).thenReturn(Optional.of(group));
+        stubActorIds();
         when(groupMemberRepository.findByGroup_IdAndUser_IdAndStatus(
                 GROUP_ID,
                 USER_ID,
@@ -130,7 +123,8 @@ class RotationActorAccessServiceTest {
 
     @Test
     void ownerAccessRejectsRegularMember() {
-        stubReadActor(GroupRole.MEMBER);
+        stubReadActor();
+        when(membership.getRole()).thenReturn(GroupRole.MEMBER);
 
         assertThrows(
                 RotationAccessDeniedException.class,
@@ -144,7 +138,8 @@ class RotationActorAccessServiceTest {
 
     @Test
     void ownerAccessReturnsAuthenticatedOwner() {
-        stubReadActor(GroupRole.OWNER);
+        stubReadActor();
+        when(membership.getRole()).thenReturn(GroupRole.OWNER);
 
         RotationActor actor = accessService.requireOwner(
                 GROUP_PUBLIC_ID,
@@ -157,7 +152,7 @@ class RotationActorAccessServiceTest {
 
     @Test
     void targetMemberMustBeActiveAndBelongToActorsGroupUuid() {
-        RotationActor actor = activeActor(GroupRole.OWNER);
+        RotationActor actor = activeActor();
         when(groupMemberRepository.findByPublicIdAndGroup_PublicIdAndStatus(
                 MEMBERSHIP_PUBLIC_ID,
                 GROUP_PUBLIC_ID,
@@ -174,7 +169,7 @@ class RotationActorAccessServiceTest {
 
     @Test
     void targetFromAnotherGroupIsReportedAsNotFound() {
-        RotationActor actor = activeActor(GroupRole.OWNER);
+        RotationActor actor = activeActor();
         when(groupMemberRepository.findByPublicIdAndGroup_PublicIdAndStatus(
                 MEMBERSHIP_PUBLIC_ID,
                 GROUP_PUBLIC_ID,
@@ -189,7 +184,7 @@ class RotationActorAccessServiceTest {
 
     @Test
     void targetUpdateUsesScopedPessimisticQuery() {
-        RotationActor actor = activeActor(GroupRole.OWNER);
+        RotationActor actor = activeActor();
         when(groupMemberRepository.findByPublicIdAndGroupPublicIdAndStatusForUpdate(
                 MEMBERSHIP_PUBLIC_ID,
                 GROUP_PUBLIC_ID,
@@ -212,7 +207,7 @@ class RotationActorAccessServiceTest {
 
     @Test
     void leftActorCannotUseTargetLookup() {
-        RotationActor actor = actor(GroupRole.OWNER, false);
+        RotationActor actor = actor(false);
 
         assertThrows(
                 RotationAccessDeniedException.class,
@@ -226,10 +221,10 @@ class RotationActorAccessServiceTest {
                 );
     }
 
-    private void stubReadActor(GroupRole role) {
+    private void stubReadActor() {
         stubAuthenticatedUser();
         when(groupRepository.findByPublicId(GROUP_PUBLIC_ID)).thenReturn(Optional.of(group));
-        stubActiveMembership(role);
+        stubActiveMembership();
     }
 
     private void stubAuthenticatedUser() {
@@ -237,24 +232,32 @@ class RotationActorAccessServiceTest {
                 .thenReturn(user);
     }
 
-    private void stubActiveMembership(GroupRole role) {
+    private void stubActiveMembership() {
+        stubActorIds();
         when(groupMemberRepository.findByGroup_IdAndUser_IdAndStatus(
                 GROUP_ID,
                 USER_ID,
                 MemberStatus.ACTIVE
         )).thenReturn(Optional.of(membership));
-        when(membership.getRole()).thenReturn(role);
     }
 
-    private RotationActor activeActor(GroupRole role) {
-        return actor(role, true);
+    private void stubActorIds() {
+        when(group.getId()).thenReturn(GROUP_ID);
+        when(user.getId()).thenReturn(USER_ID);
     }
 
-    private RotationActor actor(GroupRole role, boolean active) {
-        when(membership.getRole()).thenReturn(role);
+    private RotationActor activeActor() {
+        return actor(true);
+    }
+
+    private RotationActor actor(boolean active) {
         when(membership.isActive()).thenReturn(active);
-        when(membership.getGroup()).thenReturn(group);
-        when(membership.getUser()).thenReturn(user);
+        if (active) {
+            when(group.getPublicId()).thenReturn(GROUP_PUBLIC_ID);
+            when(user.getId()).thenReturn(USER_ID);
+            when(membership.getGroup()).thenReturn(group);
+            when(membership.getUser()).thenReturn(user);
+        }
         return new RotationActor(group, membership, user);
     }
 }

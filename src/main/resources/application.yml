@@ -61,6 +61,7 @@ cloud:
 
 app:
   public-base-url: "${APP_PUBLIC_BASE_URL:}"
+  oauth2-success-url: "${APP_OAUTH2_SUCCESS_URL:/}"
 
 server:
   port: ${SERVER_PORT:8080}
