@@ -10,7 +10,9 @@ public record CandidateSnapshot(
         boolean active,
         boolean eligible,
         boolean declinedCurrentOccurrence,
-        int completedSameChoreCount,
+        long completedSameChoreCount,
+        long fairnessCredit,
+        long effectiveCompletedSameChoreCount,
         int activePeriodLoad,
         boolean previousAssignee,
         CandidateDecision decision
@@ -27,6 +29,8 @@ public record CandidateSnapshot(
                 candidate.eligible(),
                 candidate.declinedCurrentOccurrence(),
                 candidate.completedSameChoreCount(),
+                candidate.fairnessCredit(),
+                candidate.effectiveCompletedSameChoreCount(),
                 candidate.activePeriodLoad(),
                 candidate.previousAssignee(),
                 decision

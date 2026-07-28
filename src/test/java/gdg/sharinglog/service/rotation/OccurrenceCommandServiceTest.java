@@ -47,6 +47,9 @@ class OccurrenceCommandServiceTest {
     OccurrenceCommandService commandService;
 
     @Autowired
+    ChoreEnrollmentService enrollmentService;
+
+    @Autowired
     UserRepository userRepository;
 
     @Autowired
@@ -271,6 +274,39 @@ class OccurrenceCommandServiceTest {
                         .getFirst()
                         .getEndReason()
         );
+    }
+
+    @Test
+    void rejoinedMemberWaitsBehindExistingMembersAndCannotReenterOldOccurrence() {
+        Context context = context("rejoin-tail");
+        addBackupOwner(context, "rejoin-tail");
+        ChoreOccurrence occurrence = generate(context);
+        GroupMember rejoining = occurrence.currentAssignee().orElseThrow();
+
+        commandService.leaveMember(rejoining.getPublicId(), ACTION_AT);
+        GroupMember replacement = occurrence.currentAssignee().orElseThrow();
+
+        Instant rejoinedAt = ACTION_AT.plusSeconds(10);
+        rejoining.reactivate(rejoinedAt);
+        groupMemberRepository.saveAndFlush(rejoining);
+        enrollmentService.activateMemberEnrollments(rejoining, rejoinedAt);
+
+        commandService.declineCurrentOccurrence(
+                occurrence.getPublicId(),
+                replacement.getPublicId(),
+                ACTION_AT.plusSeconds(20)
+        );
+
+        assertNotEquals(
+                rejoining.getId(),
+                occurrence.currentAssignee().orElseThrow().getId()
+        );
+
+        ChoreOccurrence next = generationService.ensureCurrentOccurrence(
+                occurrence.getChore().getId(),
+                REFERENCE.plusSeconds(86_400)
+        );
+        assertNotEquals(rejoining.getId(), next.currentAssignee().orElseThrow().getId());
     }
 
     @Test

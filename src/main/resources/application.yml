@@ -60,9 +60,20 @@ cloud:
     region: ${AWS_REGION:ap-northeast-2}
 
 app:
+  frontend-origin: "${APP_FRONTEND_ORIGIN:http://localhost:8080}"
   public-base-url: "${APP_PUBLIC_BASE_URL:}"
   oauth2-success-url: "${APP_OAUTH2_SUCCESS_URL:/}"
+  oauth2-failure-url: "${APP_OAUTH2_FAILURE_URL:/login?error=true}"
 
 server:
   port: ${SERVER_PORT:8080}
   forward-headers-strategy: framework
+  servlet:
+    session:
+      cookie:
+        # Local development serves the temporary UI and API from localhost:8080.
+        # Cross-site production deployments must override these values with
+        # SESSION_COOKIE_SECURE=true and SESSION_COOKIE_SAME_SITE=none.
+        http-only: true
+        secure: ${SESSION_COOKIE_SECURE:false}
+        same-site: ${SESSION_COOKIE_SAME_SITE:lax}

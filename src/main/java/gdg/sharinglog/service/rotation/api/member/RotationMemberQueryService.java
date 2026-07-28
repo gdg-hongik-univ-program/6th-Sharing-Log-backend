@@ -54,6 +54,11 @@ public class RotationMemberQueryService {
                     );
                 })
                 .toList();
-        return new RotationMemberListResponse(actor.group().getPublicId(), items);
+        return new RotationMemberListResponse(
+                actor.group().getPublicId(),
+                actor.membership().getPublicId(),
+                actor.isOwner(),
+                items
+        );
     }
 }

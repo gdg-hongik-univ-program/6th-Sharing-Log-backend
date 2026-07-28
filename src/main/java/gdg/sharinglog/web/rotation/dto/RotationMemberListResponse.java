@@ -7,6 +7,8 @@ import gdg.sharinglog.domain.MemberStatus;
 
 public record RotationMemberListResponse(
         String groupId,
+        String actorMembershipId,
+        boolean canManage,
         List<Member> items
 ) {
 

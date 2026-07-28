@@ -22,6 +22,7 @@ class GroupMemberLifecycleTest {
         SharingGroup group = new SharingGroup("우리 집", user);
         GroupMember member = GroupMember.member(group, user);
         String publicId = member.getPublicId();
+        long activationGeneration = member.getActivationGeneration();
         Instant leftAt = Instant.parse("2026-07-23T02:00:00Z");
 
         member.leave(leftAt);
@@ -37,6 +38,7 @@ class GroupMemberLifecycleTest {
         assertTrue(member.isActive());
         assertEquals(MemberStatus.ACTIVE, member.getStatus());
         assertEquals(rejoinedAt, member.getJoinedAt());
+        assertEquals(activationGeneration + 1, member.getActivationGeneration());
         assertNull(member.getLeftAt());
         assertNotNull(member.getPublicId());
     }

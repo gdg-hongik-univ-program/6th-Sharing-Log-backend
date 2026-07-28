@@ -5,6 +5,7 @@ import static org.hamcrest.Matchers.startsWith;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oauth2Login;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -17,7 +18,8 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
 
-@SpringBootTest
+@SpringBootTest(properties =
+        "app.oauth2-failure-url=https://6th-sharing-log-frontend-teal.vercel.app/?error=true")
 @AutoConfigureMockMvc
 class LoginFlowTest {
 
@@ -48,6 +50,34 @@ class LoginFlowTest {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(header().string("Location",
                         startsWith("https://nid.naver.com/oauth2.0/authorize?")));
+    }
+
+    @Test
+    void failedOAuth2CallbackRedirectsToFrontend() throws Exception {
+        mockMvc.perform(get("/login/oauth2/code/google")
+                        .param("error", "access_denied"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(header().string(
+                        "Location",
+                        "https://6th-sharing-log-frontend-teal.vercel.app/?error=true"
+                ));
+    }
+
+    @Test
+    void allowsCredentialedRequestsFromFrontendOrigin() throws Exception {
+        mockMvc.perform(options("/api/auth/csrf")
+                        .header("Origin",
+                                "https://6th-sharing-log-frontend-teal.vercel.app")
+                        .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(
+                        "Access-Control-Allow-Origin",
+                        "https://6th-sharing-log-frontend-teal.vercel.app"
+                ))
+                .andExpect(header().string(
+                        "Access-Control-Allow-Credentials",
+                        "true"
+                ));
     }
 
     @Test

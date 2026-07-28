@@ -2,18 +2,17 @@ package gdg.sharinglog.service.rotation;
 
 import java.time.LocalDate;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
-import java.util.Set;
 
 import gdg.sharinglog.domain.GroupMember;
 import gdg.sharinglog.domain.rotation.AssignmentEndReason;
 import gdg.sharinglog.domain.rotation.AssignmentTrigger;
 import gdg.sharinglog.domain.rotation.ChoreAssignmentAttempt;
+import gdg.sharinglog.domain.rotation.ChoreEligibleMember;
 import gdg.sharinglog.domain.rotation.ChoreOccurrence;
 import gdg.sharinglog.domain.rotation.NoCandidateReason;
 import gdg.sharinglog.domain.rotation.OccurrenceStatus;
@@ -21,6 +20,7 @@ import gdg.sharinglog.domain.rotation.RotationDecisionLog;
 import gdg.sharinglog.repository.GroupMemberRepository;
 import gdg.sharinglog.repository.SharingGroupRepository;
 import gdg.sharinglog.repository.rotation.ChoreAssignmentAttemptRepository;
+import gdg.sharinglog.repository.rotation.ChoreEligibleMemberRepository;
 import gdg.sharinglog.repository.rotation.ChoreOccurrenceRepository;
 import gdg.sharinglog.repository.rotation.OccurrenceEligibleMemberRepository;
 import gdg.sharinglog.repository.rotation.RotationDecisionLogRepository;
@@ -35,12 +35,13 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class RotationAssignmentService {
 
-    public static final String ALGORITHM_VERSION = "fair-random-v1";
+    public static final String ALGORITHM_VERSION = "fair-random-v2";
 
     private final SharingGroupRepository sharingGroupRepository;
     private final GroupMemberRepository groupMemberRepository;
     private final ChoreOccurrenceRepository occurrenceRepository;
     private final ChoreAssignmentAttemptRepository assignmentRepository;
+    private final ChoreEligibleMemberRepository enrollmentRepository;
     private final OccurrenceEligibleMemberRepository eligibilityRepository;
     private final RotationDecisionLogRepository decisionLogRepository;
     private final DecisionSeedGenerator seedGenerator;
@@ -51,6 +52,7 @@ public class RotationAssignmentService {
             GroupMemberRepository groupMemberRepository,
             ChoreOccurrenceRepository occurrenceRepository,
             ChoreAssignmentAttemptRepository assignmentRepository,
+            ChoreEligibleMemberRepository enrollmentRepository,
             OccurrenceEligibleMemberRepository eligibilityRepository,
             RotationDecisionLogRepository decisionLogRepository,
             DecisionSeedGenerator seedGenerator,
@@ -60,6 +62,7 @@ public class RotationAssignmentService {
         this.groupMemberRepository = groupMemberRepository;
         this.occurrenceRepository = occurrenceRepository;
         this.assignmentRepository = assignmentRepository;
+        this.enrollmentRepository = enrollmentRepository;
         this.eligibilityRepository = eligibilityRepository;
         this.decisionLogRepository = decisionLogRepository;
         this.seedGenerator = seedGenerator;
@@ -90,7 +93,9 @@ public class RotationAssignmentService {
         List<GroupMember> groupMembers = groupMemberRepository.findAllByGroup_Id(
                 occurrence.getChore().getGroup().getId()
         );
-        Set<Long> eligibleMembershipIds = currentEligibleMembershipIds(occurrence);
+        Map<Long, Long> eligibleActivationGenerations =
+                currentEligibleActivationGenerations(occurrence);
+        Map<Long, Long> fairnessCredits = currentFairnessCredits(occurrence);
         Optional<Long> previousAssigneeId = previousAssigneeId(occurrence);
         Map<Long, GroupMember> membersById = new HashMap<>();
 
@@ -99,7 +104,8 @@ public class RotationAssignmentService {
                 .map(member -> candidate(
                         occurrence,
                         member,
-                        eligibleMembershipIds.contains(member.getId()),
+                        belongsToSnapshot(member, eligibleActivationGenerations),
+                        fairnessCredits.getOrDefault(member.getId(), 0L),
                         previousAssigneeId.filter(member.getId()::equals).isPresent()
                 ))
                 .toList();
@@ -118,7 +124,11 @@ public class RotationAssignmentService {
                     membersById.get(assigned.selectedMembershipId()),
                     "선택된 멤버가 그룹 후보 목록에 없습니다."
             );
-            validateSelectedMember(occurrence, selectedMember, eligibleMembershipIds);
+            validateSelectedMember(
+                    occurrence,
+                    selectedMember,
+                    eligibleActivationGenerations
+            );
             int sequenceNumber = Math.toIntExact(
                     assignmentRepository.countByOccurrence_Id(occurrence.getId()) + 1
             );
@@ -181,10 +191,10 @@ public class RotationAssignmentService {
     private void validateSelectedMember(
             ChoreOccurrence occurrence,
             GroupMember selectedMember,
-            Set<Long> eligibleMembershipIds
+            Map<Long, Long> eligibleActivationGenerations
     ) {
         if (!selectedMember.isActive()
-                || !eligibleMembershipIds.contains(selectedMember.getId())
+                || !belongsToSnapshot(selectedMember, eligibleActivationGenerations)
                 || assignmentRepository.existsByOccurrence_IdAndAssignee_IdAndEndReason(
                         occurrence.getId(),
                         selectedMember.getId(),
@@ -194,15 +204,40 @@ public class RotationAssignmentService {
         }
     }
 
-    private Set<Long> currentEligibleMembershipIds(ChoreOccurrence occurrence) {
+    private Map<Long, Long> currentEligibleActivationGenerations(
+            ChoreOccurrence occurrence
+    ) {
         return eligibilityRepository
                 .findAllByOccurrence_IdAndSnapshotVersionOrderById(
                         occurrence.getId(),
                         occurrence.getEligibilitySnapshotVersion()
                 )
                 .stream()
-                .map(snapshot -> snapshot.getMember().getId())
-                .collect(HashSet::new, HashSet::add, HashSet::addAll);
+                .collect(java.util.stream.Collectors.toMap(
+                        snapshot -> snapshot.getMember().getId(),
+                        snapshot -> snapshot.getMemberActivationGeneration()
+                ));
+    }
+
+    private Map<Long, Long> currentFairnessCredits(ChoreOccurrence occurrence) {
+        return enrollmentRepository.findAllByChore_IdOrderById(
+                        occurrence.getChore().getId()
+                )
+                .stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        enrollment -> enrollment.getMember().getId(),
+                        ChoreEligibleMember::getFairnessCredit
+                ));
+    }
+
+    private boolean belongsToSnapshot(
+            GroupMember member,
+            Map<Long, Long> eligibleActivationGenerations
+    ) {
+        return Optional.ofNullable(eligibleActivationGenerations.get(member.getId()))
+                .filter(generation ->
+                        generation.longValue() == member.getActivationGeneration())
+                .isPresent();
     }
 
     private Optional<Long> previousAssigneeId(ChoreOccurrence occurrence) {
@@ -221,6 +256,7 @@ public class RotationAssignmentService {
             ChoreOccurrence occurrence,
             GroupMember member,
             boolean eligible,
+            long fairnessCredit,
             boolean previousAssignee
     ) {
         long completedSameChoreCount = assignmentRepository.countCompletedForChoreAndMember(
@@ -245,7 +281,8 @@ public class RotationAssignmentService {
                 member.isActive(),
                 eligible,
                 declined,
-                Math.toIntExact(completedSameChoreCount),
+                completedSameChoreCount,
+                fairnessCredit,
                 Math.toIntExact(activePeriodLoad),
                 previousAssignee
         );

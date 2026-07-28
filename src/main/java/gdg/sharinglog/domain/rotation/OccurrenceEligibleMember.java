@@ -57,6 +57,9 @@ public class OccurrenceEligibleMember {
     )
     private GroupMember member;
 
+    @Column(name = "member_activation_generation", nullable = false)
+    private long memberActivationGeneration;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -75,6 +78,14 @@ public class OccurrenceEligibleMember {
         if (member.getGroup() != occurrence.getChore().getGroup()) {
             throw new IllegalArgumentException("가능 멤버는 회차와 같은 그룹에 속해야 합니다.");
         }
+        this.memberActivationGeneration = member.getActivationGeneration();
+        if (memberActivationGeneration < 1) {
+            throw new IllegalArgumentException("멤버 활성 세대는 1 이상이어야 합니다.");
+        }
         this.createdAt = Objects.requireNonNull(createdAt, "스냅샷 생성 시각은 필수입니다.");
+    }
+
+    public boolean belongsToCurrentActivation() {
+        return memberActivationGeneration == member.getActivationGeneration();
     }
 }

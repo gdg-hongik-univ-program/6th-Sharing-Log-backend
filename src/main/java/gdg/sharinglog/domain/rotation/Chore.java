@@ -90,6 +90,9 @@ public class Chore {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Column(name = "eligibility_revision", nullable = false)
+    private long eligibilityRevision;
+
     @Version
     @Column(name = "version", nullable = false)
     private long version;
@@ -116,6 +119,7 @@ public class Chore {
         this.createdAt = Objects.requireNonNull(createdAt, "생성 시각은 필수입니다.");
         this.publicId = UUID.randomUUID().toString();
         this.active = true;
+        this.eligibilityRevision = 0L;
         validateSchedule();
     }
 
@@ -169,6 +173,10 @@ public class Chore {
 
     public void activate() {
         this.active = true;
+    }
+
+    public void recordEnrollmentChange() {
+        this.eligibilityRevision = Math.incrementExact(this.eligibilityRevision);
     }
 
     private void validateSchedule() {

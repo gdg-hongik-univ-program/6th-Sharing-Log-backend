@@ -276,8 +276,8 @@ public class ChoreOccurrence {
     }
 
     public void advanceEligibilitySnapshotVersion() {
-        if (status != OccurrenceStatus.NEEDS_ATTENTION) {
-            throw new IllegalStateException("관리 필요 회차의 가능 멤버 조건만 갱신할 수 있습니다.");
+        if (status.isTerminal()) {
+            throw new IllegalStateException("종료된 회차의 가능 멤버 조건은 갱신할 수 없습니다.");
         }
         eligibilitySnapshotVersion++;
     }
