@@ -34,3 +34,14 @@ cloud:
 
   s3:
     bucket: springboot-developer-neon1005
+
+app:
+  frontend-origin: https://6th-sharing-log-frontend-teal.vercel.app
+
+server:
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        secure: true
+        same-site: none

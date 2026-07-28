@@ -1,5 +1,6 @@
 package gdg.sharinglog.domain.rotation;
 
+import java.time.Instant;
 import java.util.Objects;
 
 import gdg.sharinglog.domain.GroupMember;
@@ -53,14 +54,89 @@ public class ChoreEligibleMember {
     )
     private GroupMember member;
 
+    @Column(name = "enabled", nullable = false)
+    private boolean enabled;
+
+    @Column(name = "member_activation_generation", nullable = false)
+    private long memberActivationGeneration;
+
+    @Column(name = "enrolled_at", nullable = false)
+    private Instant enrolledAt;
+
+    @Column(name = "disabled_at")
+    private Instant disabledAt;
+
+    @Column(name = "fairness_credit", nullable = false)
+    private long fairnessCredit;
+
     public ChoreEligibleMember(Chore chore, GroupMember member) {
+        this(chore, member, chore.getCreatedAt(), 0L);
+    }
+
+    public ChoreEligibleMember(
+            Chore chore,
+            GroupMember member,
+            Instant enrolledAt,
+            long fairnessCredit
+    ) {
         this.chore = Objects.requireNonNull(chore, "업무는 필수입니다.");
         this.member = Objects.requireNonNull(member, "가능 멤버는 필수입니다.");
-        if (chore.getEligibilityMode() != ChoreEligibilityMode.SELECTED_MEMBERS) {
-            throw new IllegalArgumentException("지정 멤버 방식의 업무에만 가능 멤버를 추가할 수 있습니다.");
-        }
         if (member.getGroup() != chore.getGroup()) {
             throw new IllegalArgumentException("가능 멤버는 업무와 같은 그룹에 속해야 합니다.");
         }
+        requireActive(member);
+        this.enabled = true;
+        this.memberActivationGeneration = requireActivationGeneration(member);
+        this.enrolledAt = Objects.requireNonNull(enrolledAt, "로테이션 등록 시각은 필수입니다.");
+        this.fairnessCredit = requireFairnessCredit(fairnessCredit);
+    }
+
+    public void enableAtBack(Instant enrolledAt, long fairnessCredit) {
+        requireActive(member);
+        this.enabled = true;
+        this.memberActivationGeneration = requireActivationGeneration(member);
+        this.enrolledAt = Objects.requireNonNull(enrolledAt, "로테이션 등록 시각은 필수입니다.");
+        this.disabledAt = null;
+        this.fairnessCredit = requireFairnessCredit(fairnessCredit);
+    }
+
+    public void disable(Instant disabledAt) {
+        if (!enabled) {
+            return;
+        }
+        this.enabled = false;
+        this.disabledAt = Objects.requireNonNull(disabledAt, "로테이션 제외 시각은 필수입니다.");
+    }
+
+    public boolean belongsToCurrentActivation() {
+        return memberActivationGeneration == member.getActivationGeneration();
+    }
+
+    public long effectiveCompletedCount(long actualCompletedCount) {
+        if (actualCompletedCount < 0) {
+            throw new IllegalArgumentException("실제 완료 횟수는 음수일 수 없습니다.");
+        }
+        return Math.addExact(actualCompletedCount, fairnessCredit);
+    }
+
+    private static void requireActive(GroupMember member) {
+        if (!member.isActive()) {
+            throw new IllegalArgumentException("활성 멤버만 로테이션에 등록할 수 있습니다.");
+        }
+    }
+
+    private static long requireActivationGeneration(GroupMember member) {
+        long generation = member.getActivationGeneration();
+        if (generation < 1) {
+            throw new IllegalArgumentException("멤버 활성 세대는 1 이상이어야 합니다.");
+        }
+        return generation;
+    }
+
+    private static long requireFairnessCredit(long fairnessCredit) {
+        if (fairnessCredit < 0) {
+            throw new IllegalArgumentException("공정성 크레딧은 음수일 수 없습니다.");
+        }
+        return fairnessCredit;
     }
 }

@@ -329,7 +329,7 @@ API는 사용자 계정 ID나 이메일 대신 그룹 멤버십의 공개 UUID�
       "trigger": "INITIAL",
       "decidedAt": "2026-07-20T00:00:01Z",
       "outcome": "ASSIGNED",
-      "algorithmVersion": "fair-random-v1",
+      "algorithmVersion": "fair-random-v2",
       "decisionSeed": "5932104873210042",
       "selectionReasonCodes": [
         "ACTIVE_ELIGIBLE_NOT_DECLINED_FILTER",
@@ -359,7 +359,7 @@ API는 사용자 계정 ID나 이메일 대신 그룹 멤버십의 공개 UUID�
       "trigger": "DECLINE_REASSIGNMENT",
       "decidedAt": "2026-07-23T13:55:00Z",
       "outcome": "ASSIGNED",
-      "algorithmVersion": "fair-random-v1",
+      "algorithmVersion": "fair-random-v2",
       "decisionSeed": "7439128746501234",
       "selectionReasonCodes": [
         "ACTIVE_ELIGIBLE_NOT_DECLINED_FILTER",
@@ -418,6 +418,8 @@ API는 사용자 계정 ID나 이메일 대신 그룹 멤버십의 공개 UUID�
 | `POST` | `/api/groups/{groupId}/occurrences/{occurrenceId}/skip-already-done` | 이미 처리됨으로 생략 | `200` |
 | `POST` | `/api/groups/{groupId}/occurrences/{occurrenceId}/decline` | 이번 회차 수행 불가 및 자동 재배정 | `200` |
 | `POST` | `/api/groups/{groupId}/occurrences/{occurrenceId}/retry-assignment` | 관리 필요 회차 재시도 | `200` |
+| `GET` | `/api/groups/{groupId}/rotation-members` | 활성 멤버와 관리 권한 조회 | `200` |
+| `PATCH` | `/api/groups/{groupId}/rotation-members/{membershipId}/chore-participations` | 여러 업무 참여 일괄 추가·제외 | `200` |
 | `POST` | `/api/groups/{groupId}/members/{membershipId}/leave` | 탈퇴/내보내기 및 미종료 회차 재배정 | `200` |
 
 ## 5. 업무 API
@@ -998,9 +1000,34 @@ If-Match: "5"
 
 두 결과 모두 `200 OK`이며 결정 감사 이력을 추가한다. 자동으로 제한을 완화하거나 임의 멤버에게 강제 배정하지 않는다. `NEEDS_ATTENTION`이 아닌 회차에 호출하면 `409 INVALID_OCCURRENCE_STATE`다.
 
-## 9. 멤버 탈퇴와 자동 재배정
+## 9. 멤버별 참여 업무 일괄 변경
 
-### 9.1 요청
+```http
+PATCH /api/groups/{groupId}/rotation-members/{membershipId}/chore-participations
+Content-Type: application/json
+Idempotency-Key: aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa
+```
+
+```json
+{
+  "addChoreIds": ["22222222-2222-4222-8222-222222222222"],
+  "removeChoreIds": ["33333333-3333-4333-8333-333333333333"],
+  "applicationScope": "NEXT_OCCURRENCE",
+  "expectedVersions": {
+    "22222222-2222-4222-8222-222222222222": 4,
+    "33333333-3333-4333-8333-333333333333": 7
+  }
+}
+```
+
+- `NEXT_OCCURRENCE`: 현재 회차의 스냅샷과 담당자는 유지하고 다음 회차부터 적용한다.
+- `CURRENT_AND_FUTURE`: 미종료 회차의 스냅샷도 갱신한다. 제외된 멤버가 현재 담당자라면 즉시 재배정하고, 추가 후 관리 필요 회차는 배정을 다시 시도한다.
+- 여러 업무는 하나의 트랜잭션에서 처리하며, 각 업무의 `expectedVersions`가 하나라도 다르면 전체 요청을 롤백한다.
+- 추가되거나 재활성화된 참여자는 공정성 라운드의 맨 뒤에서 시작한다.
+
+## 10. 멤버 탈퇴와 자동 재배정
+
+### 10.1 요청
 
 본인 탈퇴와 `OWNER`의 멤버 내보내기는 같은 도메인 명령을 사용한다.
 
@@ -1015,7 +1042,7 @@ If-Match: "2"
 {}
 ```
 
-### 9.2 성공 응답
+### 10.2 성공 응답
 
 ```http
 HTTP/1.1 200 OK
@@ -1059,7 +1086,7 @@ ETag: "3"
 }
 ```
 
-### 9.3 트랜잭션 효과
+### 10.3 트랜잭션 효과
 
 1. 멤버를 `LEFT`로 바꾸고 `leftAt`을 기록한다.
 2. 그 멤버가 현재 담당자인 모든 `ASSIGNED` 회차를 조회한다.
@@ -1074,7 +1101,7 @@ ETag: "3"
 
 이미 탈퇴한 멤버를 새 멱등 키로 다시 탈퇴시키면 `409 MEMBER_ALREADY_LEFT`다. 최초 요청과 같은 멱등 키 재전송은 최초 `200` 응답을 재생한다. 유일한 `OWNER`의 탈퇴 등 기존 그룹 정책상 허용되지 않는 경우 `409 LAST_OWNER_CANNOT_LEAVE`를 반환한다.
 
-## 10. 상태 코드와 오류 코드
+## 11. 상태 코드와 오류 코드
 
 | HTTP | 대표 코드 | 의미 |
 |---|---|---|
@@ -1095,7 +1122,7 @@ ETag: "3"
 
 후보가 없거나 재시도 후에도 배정되지 않은 상황은 `409`가 아니다. 회차 상태와 `outcome`으로 표현한다.
 
-## 11. 구현 불변조건 체크리스트
+## 12. 구현 불변조건 체크리스트
 
 API 구현은 어느 진입점에서도 다음 조건을 깨뜨리면 안 된다.
 

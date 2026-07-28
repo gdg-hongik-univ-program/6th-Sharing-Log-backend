@@ -86,6 +86,24 @@ public interface ChoreOccurrenceRepository extends JpaRepository<ChoreOccurrence
             OccurrenceStatus status
     );
 
+    @EntityGraph(attributePaths = {
+            "chore",
+            "currentAssignment",
+            "currentAssignment.assignee"
+    })
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select occurrence
+            from ChoreOccurrence occurrence
+            where occurrence.chore.id = :choreId
+              and occurrence.status in (
+                  gdg.sharinglog.domain.rotation.OccurrenceStatus.ASSIGNED,
+                  gdg.sharinglog.domain.rotation.OccurrenceStatus.NEEDS_ATTENTION
+              )
+            order by occurrence.id asc
+            """)
+    List<ChoreOccurrence> findAllOpenByChoreIdForUpdate(@Param("choreId") Long choreId);
+
     @EntityGraph(attributePaths = {"chore", "currentAssignment", "currentAssignment.assignee"})
     List<ChoreOccurrence> findAllByChore_Group_IdAndPeriodStartBetweenOrderByPeriodStartAscIdAsc(
             Long groupId,

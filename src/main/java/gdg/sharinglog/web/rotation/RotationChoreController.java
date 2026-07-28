@@ -5,6 +5,7 @@ import java.util.List;
 
 import gdg.sharinglog.domain.rotation.ChoreFrequency;
 import gdg.sharinglog.service.rotation.api.chore.ChoreApplicationService;
+import gdg.sharinglog.service.rotation.api.chore.ChoreLifecycleApplicationService;
 import gdg.sharinglog.service.rotation.api.chore.CreateChoreCommand;
 import gdg.sharinglog.service.rotation.api.idempotency.CommandResponse;
 import gdg.sharinglog.service.rotation.api.idempotency.IdempotentCommandExecutor;
@@ -20,6 +21,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -35,15 +37,18 @@ import org.springframework.web.bind.annotation.RestController;
 public class RotationChoreController {
 
     private final ChoreApplicationService choreService;
+    private final ChoreLifecycleApplicationService lifecycleService;
     private final IdempotentCommandExecutor idempotentExecutor;
     private final RotationViewMapper viewMapper;
 
     public RotationChoreController(
             ChoreApplicationService choreService,
+            ChoreLifecycleApplicationService lifecycleService,
             IdempotentCommandExecutor idempotentExecutor,
             RotationViewMapper viewMapper
     ) {
         this.choreService = choreService;
+        this.lifecycleService = lifecycleService;
         this.idempotentExecutor = idempotentExecutor;
         this.viewMapper = viewMapper;
     }
@@ -106,6 +111,44 @@ public class RotationChoreController {
                 .map(viewMapper::chore)
                 .toList();
         return new ChoreListResponse(items, null, false);
+    }
+
+    @DeleteMapping("/{choreId}")
+    public ResponseEntity<Void> deactivate(
+            @PathVariable String groupId,
+            @PathVariable String choreId,
+            @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey,
+            @RequestHeader(name = "If-Match", required = false) String ifMatch,
+            OAuth2AuthenticationToken authentication,
+            HttpServletRequest servletRequest
+    ) {
+        ExpectedVersion expectedVersion = ExpectedVersion.parse(ifMatch);
+        var result = idempotentExecutor.execute(
+                authentication.getAuthorizedClientRegistrationId(),
+                authentication.getPrincipal(),
+                servletRequest.getMethod(),
+                servletRequest.getRequestURI(),
+                IdempotencyKey.parse(idempotencyKey),
+                null,
+                ifMatch,
+                Void.class,
+                () -> {
+                    long version = lifecycleService.deactivate(
+                            groupId,
+                            choreId,
+                            authentication.getAuthorizedClientRegistrationId(),
+                            authentication.getPrincipal(),
+                            expectedVersion.value()
+                    );
+                    return new CommandResponse<>(
+                            204,
+                            null,
+                            etag(version),
+                            null
+                    );
+                }
+        );
+        return RotationHttpResponses.from(result);
     }
 
     private CreateChoreCommand toCommand(CreateChoreRequest request) {

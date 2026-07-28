@@ -61,19 +61,20 @@ public final class RotationAssignmentEngine {
             );
         }
 
-        int minimumCompletedCount = finalists.stream()
-                .mapToInt(RotationCandidate::completedSameChoreCount)
+        long minimumCompletedCount = finalists.stream()
+                .mapToLong(RotationCandidate::effectiveCompletedSameChoreCount)
                 .min()
                 .orElseThrow();
         eliminate(
                 finalists,
                 decisions,
-                candidate -> candidate.completedSameChoreCount() > minimumCompletedCount,
+                candidate ->
+                        candidate.effectiveCompletedSameChoreCount() > minimumCompletedCount,
                 CandidateDecision.HIGHER_COMPLETED_SAME_CHORE_COUNT
         );
         reasons.add(reason(
                 SelectionReasonCode.MINIMUM_SAME_CHORE_COMPLETION_COUNT,
-                "Kept candidates with the minimum same-chore completion count of "
+                "Kept candidates with the minimum effective same-chore completion count of "
                         + minimumCompletedCount
         ));
 

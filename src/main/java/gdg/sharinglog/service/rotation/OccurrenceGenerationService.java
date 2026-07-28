@@ -5,15 +5,11 @@ import java.util.List;
 import java.util.Objects;
 
 import gdg.sharinglog.domain.GroupMember;
-import gdg.sharinglog.domain.MemberStatus;
 import gdg.sharinglog.domain.rotation.AssignmentTrigger;
 import gdg.sharinglog.domain.rotation.Chore;
-import gdg.sharinglog.domain.rotation.ChoreEligibilityMode;
 import gdg.sharinglog.domain.rotation.ChoreOccurrence;
 import gdg.sharinglog.domain.rotation.OccurrenceEligibleMember;
-import gdg.sharinglog.repository.GroupMemberRepository;
 import gdg.sharinglog.repository.SharingGroupRepository;
-import gdg.sharinglog.repository.rotation.ChoreEligibleMemberRepository;
 import gdg.sharinglog.repository.rotation.ChoreOccurrenceRepository;
 import gdg.sharinglog.repository.rotation.ChoreRepository;
 import gdg.sharinglog.repository.rotation.OccurrenceEligibleMemberRepository;
@@ -25,30 +21,27 @@ public class OccurrenceGenerationService {
 
     private final SharingGroupRepository sharingGroupRepository;
     private final ChoreRepository choreRepository;
-    private final ChoreEligibleMemberRepository choreEligibleMemberRepository;
     private final ChoreOccurrenceRepository occurrenceRepository;
     private final OccurrenceEligibleMemberRepository occurrenceEligibleMemberRepository;
-    private final GroupMemberRepository groupMemberRepository;
     private final ChoreOccurrenceScheduleResolver scheduleResolver;
+    private final ChoreEnrollmentService enrollmentService;
     private final RotationAssignmentService assignmentService;
 
     public OccurrenceGenerationService(
             SharingGroupRepository sharingGroupRepository,
             ChoreRepository choreRepository,
-            ChoreEligibleMemberRepository choreEligibleMemberRepository,
             ChoreOccurrenceRepository occurrenceRepository,
             OccurrenceEligibleMemberRepository occurrenceEligibleMemberRepository,
-            GroupMemberRepository groupMemberRepository,
             ChoreOccurrenceScheduleResolver scheduleResolver,
+            ChoreEnrollmentService enrollmentService,
             RotationAssignmentService assignmentService
     ) {
         this.sharingGroupRepository = sharingGroupRepository;
         this.choreRepository = choreRepository;
-        this.choreEligibleMemberRepository = choreEligibleMemberRepository;
         this.occurrenceRepository = occurrenceRepository;
         this.occurrenceEligibleMemberRepository = occurrenceEligibleMemberRepository;
-        this.groupMemberRepository = groupMemberRepository;
         this.scheduleResolver = scheduleResolver;
+        this.enrollmentService = enrollmentService;
         this.assignmentService = assignmentService;
     }
 
@@ -87,7 +80,8 @@ public class OccurrenceGenerationService {
                 )
         );
 
-        List<GroupMember> eligibleMembers = eligibleMembers(chore);
+        enrollmentService.synchronizeAutomaticEnrollments(chore, createdAt);
+        List<GroupMember> eligibleMembers = enrollmentService.findActiveMembers(chore);
         List<OccurrenceEligibleMember> snapshots = eligibleMembers.stream()
                 .map(member -> new OccurrenceEligibleMember(
                         occurrence,
@@ -101,17 +95,4 @@ public class OccurrenceGenerationService {
         return occurrence;
     }
 
-    private List<GroupMember> eligibleMembers(Chore chore) {
-        if (chore.getEligibilityMode() == ChoreEligibilityMode.ALL_ACTIVE_MEMBERS) {
-            return groupMemberRepository.findAllByGroup_IdAndStatusOrderById(
-                    chore.getGroup().getId(),
-                    MemberStatus.ACTIVE
-            );
-        }
-        return choreEligibleMemberRepository
-                .findAllByChore_IdOrderById(chore.getId())
-                .stream()
-                .map(eligible -> eligible.getMember())
-                .toList();
-    }
 }

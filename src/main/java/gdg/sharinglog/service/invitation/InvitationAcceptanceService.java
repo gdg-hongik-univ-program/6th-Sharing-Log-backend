@@ -16,6 +16,7 @@ import gdg.sharinglog.service.invitation.exception.InvitationNotFoundException;
 import gdg.sharinglog.service.invitation.exception.InvitationUnavailableException;
 import gdg.sharinglog.service.invitation.result.AcceptedInvitation;
 import gdg.sharinglog.service.invitation.result.InvitationPreview;
+import gdg.sharinglog.service.rotation.ChoreEnrollmentService;
 import gdg.sharinglog.service.user.AuthenticatedUserService;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
@@ -31,17 +32,20 @@ public class InvitationAcceptanceService {
     private final SharingGroupRepository sharingGroupRepository;
     private final InvitationCodeHasher codeHasher;
     private final AuthenticatedUserService authenticatedUserService;
+    private final ChoreEnrollmentService choreEnrollmentService;
 
     public InvitationAcceptanceService(GroupInvitationRepository invitationRepository,
                                        GroupMemberRepository groupMemberRepository,
                                        SharingGroupRepository sharingGroupRepository,
                                        InvitationCodeHasher codeHasher,
-                                       AuthenticatedUserService authenticatedUserService) {
+                                       AuthenticatedUserService authenticatedUserService,
+                                       ChoreEnrollmentService choreEnrollmentService) {
         this.invitationRepository = invitationRepository;
         this.groupMemberRepository = groupMemberRepository;
         this.sharingGroupRepository = sharingGroupRepository;
         this.codeHasher = codeHasher;
         this.authenticatedUserService = authenticatedUserService;
+        this.choreEnrollmentService = choreEnrollmentService;
     }
 
     @Transactional(readOnly = true)
@@ -79,16 +83,21 @@ public class InvitationAcceptanceService {
                 .orElseThrow(() -> new IllegalStateException("초대의 그룹을 찾을 수 없습니다."));
         Optional<GroupMember> existingMembership = groupMemberRepository
                 .findByGroup_IdAndUser_Id(group.getId(), user.getId());
+        Instant acceptedAt = Instant.now();
         if (existingMembership.isPresent()) {
             GroupMember membership = existingMembership.get();
             if (membership.isActive()) {
                 return acceptance(membership, false);
             }
-            membership.reactivate(Instant.now());
-            return acceptance(groupMemberRepository.save(membership), true);
+            membership.reactivate(acceptedAt);
+            GroupMember reactivated = groupMemberRepository.saveAndFlush(membership);
+            choreEnrollmentService.activateMemberEnrollments(reactivated, acceptedAt);
+            return acceptance(reactivated, true);
         }
 
-        GroupMember membership = groupMemberRepository.save(GroupMember.member(group, user));
+        GroupMember membership =
+                groupMemberRepository.saveAndFlush(GroupMember.member(group, user));
+        choreEnrollmentService.activateMemberEnrollments(membership, acceptedAt);
         return acceptance(membership, true);
     }
 

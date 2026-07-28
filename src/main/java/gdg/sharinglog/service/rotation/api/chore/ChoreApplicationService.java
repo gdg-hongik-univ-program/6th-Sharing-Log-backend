@@ -9,12 +9,11 @@ import java.util.Set;
 import gdg.sharinglog.domain.GroupMember;
 import gdg.sharinglog.domain.MemberStatus;
 import gdg.sharinglog.domain.rotation.Chore;
-import gdg.sharinglog.domain.rotation.ChoreEligibleMember;
 import gdg.sharinglog.domain.rotation.ChoreEligibilityMode;
 import gdg.sharinglog.domain.rotation.ChoreFrequency;
 import gdg.sharinglog.repository.GroupMemberRepository;
-import gdg.sharinglog.repository.rotation.ChoreEligibleMemberRepository;
 import gdg.sharinglog.repository.rotation.ChoreRepository;
+import gdg.sharinglog.service.rotation.ChoreEnrollmentService;
 import gdg.sharinglog.service.rotation.OccurrenceGenerationService;
 import gdg.sharinglog.service.rotation.access.RotationActor;
 import gdg.sharinglog.service.rotation.access.RotationActorAccessService;
@@ -29,20 +28,20 @@ public class ChoreApplicationService {
     private final RotationActorAccessService accessService;
     private final GroupMemberRepository groupMemberRepository;
     private final ChoreRepository choreRepository;
-    private final ChoreEligibleMemberRepository eligibleMemberRepository;
+    private final ChoreEnrollmentService enrollmentService;
     private final OccurrenceGenerationService occurrenceGenerationService;
 
     public ChoreApplicationService(
             RotationActorAccessService accessService,
             GroupMemberRepository groupMemberRepository,
             ChoreRepository choreRepository,
-            ChoreEligibleMemberRepository eligibleMemberRepository,
+            ChoreEnrollmentService enrollmentService,
             OccurrenceGenerationService occurrenceGenerationService
     ) {
         this.accessService = accessService;
         this.groupMemberRepository = groupMemberRepository;
         this.choreRepository = choreRepository;
-        this.eligibleMemberRepository = eligibleMemberRepository;
+        this.enrollmentService = enrollmentService;
         this.occurrenceGenerationService = occurrenceGenerationService;
     }
 
@@ -61,14 +60,7 @@ public class ChoreApplicationService {
                 accessService.requireOwnerForUpdate(groupPublicId, registrationId, principal);
         List<GroupMember> selectedMembers = resolveSelectedMembers(actor, command);
         Chore chore = choreRepository.saveAndFlush(createChore(actor, command, effectiveCreatedAt));
-
-        if (!selectedMembers.isEmpty()) {
-            eligibleMemberRepository.saveAllAndFlush(
-                    selectedMembers.stream()
-                            .map(member -> new ChoreEligibleMember(chore, member))
-                            .toList()
-            );
-        }
+        enrollmentService.initializeChore(chore, selectedMembers, effectiveCreatedAt);
 
         var occurrence =
                 occurrenceGenerationService.ensureCurrentOccurrence(chore.getId(), effectiveCreatedAt);
@@ -163,11 +155,6 @@ public class ChoreApplicationService {
     }
 
     private List<GroupMember> currentEligibleMembers(Chore chore) {
-        if (chore.getEligibilityMode() == ChoreEligibilityMode.ALL_ACTIVE_MEMBERS) {
-            return List.of();
-        }
-        return eligibleMemberRepository.findAllByChore_IdOrderById(chore.getId()).stream()
-                .map(ChoreEligibleMember::getMember)
-                .toList();
+        return enrollmentService.findActiveMembers(chore);
     }
 }

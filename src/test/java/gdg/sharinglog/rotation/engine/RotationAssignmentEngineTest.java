@@ -62,6 +62,19 @@ class RotationAssignmentEngineTest {
     }
 
     @Test
+    void fairnessCreditPlacesRejoinedMemberBehindCurrentRound() {
+        RotationAssignmentResult.Assigned result = assigned(
+                new RotationAssignmentEngine(new Random(31)),
+                List.of(
+                        new RotationCandidate(1, true, true, false, 2, 0, 0, false),
+                        new RotationCandidate(2, true, true, false, 0, 3, 0, false)
+                )
+        );
+
+        assertEquals(1L, result.selectedMembershipId());
+    }
+
+    @Test
     void minimumActivePeriodLoadBreaksCompletionCountTie() {
         RotationAssignmentResult.Assigned result = assigned(new RotationAssignmentEngine(new Random(4)), List.of(
                 candidate(1, true, true, false, 2, 3, false),

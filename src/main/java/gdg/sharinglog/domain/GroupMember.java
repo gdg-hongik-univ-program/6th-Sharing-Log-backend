@@ -74,6 +74,9 @@ public class GroupMember {
     @Column(name = "left_at")
     private Instant leftAt;
 
+    @Column(name = "activation_generation", nullable = false)
+    private long activationGeneration;
+
     @Version
     @Column(name = "version", nullable = false)
     private long version;
@@ -85,6 +88,7 @@ public class GroupMember {
         this.publicId = UUID.randomUUID().toString();
         this.status = MemberStatus.ACTIVE;
         this.joinedAt = Instant.now();
+        this.activationGeneration = 1L;
     }
 
     public static GroupMember owner(SharingGroup group, User user) {
@@ -113,6 +117,7 @@ public class GroupMember {
             throw new IllegalStateException("이미 활성 상태인 멤버입니다.");
         }
         Instant effectiveRejoinedAt = Objects.requireNonNull(rejoinedAt, "재가입 시각은 필수입니다.");
+        this.activationGeneration = Math.incrementExact(this.activationGeneration);
         this.status = MemberStatus.ACTIVE;
         this.joinedAt = effectiveRejoinedAt;
         this.leftAt = null;

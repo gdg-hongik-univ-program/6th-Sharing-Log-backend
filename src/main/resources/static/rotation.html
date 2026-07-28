@@ -15,7 +15,12 @@
             <h1>업무 로테이션</h1>
             <p class="copy">공정성 점수가 같은 후보 사이에서만 무작위로 담당자를 정해요.</p>
         </div>
-        <button id="open-create-chore" class="primary-button" type="button">업무 추가</button>
+        <div class="rotation-header-actions">
+            <button id="open-manage-rotation" class="secondary-button" type="button" hidden>
+                로테이션 관리
+            </button>
+            <button id="open-create-chore" class="primary-button" type="button">업무 추가</button>
+        </div>
     </header>
 
     <nav class="rotation-tabs" aria-label="반복 주기">
@@ -71,10 +76,82 @@
             </label>
             <fieldset id="selected-members-field" hidden>
                 <legend>지정 멤버</legend>
-                <div id="eligible-member-list">멤버를 불러오는 중...</div>
+                <div id="eligible-member-list" class="member-check-list">멤버를 불러오는 중...</div>
             </fieldset>
             <button class="primary-button full-button" type="submit">생성하고 자동 배정</button>
             <p id="create-chore-status" class="rotation-status" role="status"></p>
+        </form>
+    </dialog>
+
+    <dialog id="manage-rotation-dialog"
+            class="rotation-dialog rotation-dialog-wide"
+            aria-labelledby="manage-rotation-title">
+        <form id="manage-rotation-form">
+            <div class="dialog-heading">
+                <div>
+                    <p class="eyebrow">ROTATION SETTINGS</p>
+                    <h2 id="manage-rotation-title">로테이션 관리</h2>
+                </div>
+                <button id="close-manage-rotation" class="icon-button" type="button" aria-label="닫기">×</button>
+            </div>
+
+            <label for="manage-member-select">관리할 멤버
+                <select id="manage-member-select" required></select>
+            </label>
+            <p id="manage-member-summary" class="form-help"></p>
+
+            <fieldset>
+                <legend>참여 업무</legend>
+                <p class="form-help">체크한 업무의 다음 담당 후보에 이 멤버가 포함됩니다.</p>
+                <div id="manage-chore-options" class="member-check-list">
+                    멤버와 업무를 불러오는 중...
+                </div>
+            </fieldset>
+
+            <fieldset>
+                <legend>변경 적용 범위</legend>
+                <label class="choice-option">
+                    <input type="radio"
+                           name="application-scope"
+                           value="NEXT_OCCURRENCE"
+                           checked>
+                    <span class="choice-copy">
+                        <strong>다음 회차부터</strong>
+                        <small>현재 담당 업무는 유지하고 이후 회차부터 변경합니다.</small>
+                    </span>
+                </label>
+                <label class="choice-option">
+                    <input type="radio"
+                           name="application-scope"
+                           value="CURRENT_AND_FUTURE">
+                    <span class="choice-copy">
+                        <strong>현재 회차부터 즉시</strong>
+                        <small>현재 담당에서 제외되면 다른 멤버에게 자동 재배정될 수 있습니다.</small>
+                    </span>
+                </label>
+            </fieldset>
+
+            <div class="dialog-actions">
+                <button id="save-member-participations" class="primary-button" type="submit">
+                    참여 업무 저장
+                </button>
+                <button id="remove-group-member" class="danger-button" type="button">
+                    그룹에서 내보내기
+                </button>
+            </div>
+            <p id="manage-rotation-status"
+               class="rotation-status"
+               role="status"
+               aria-live="polite"></p>
+
+            <hr class="dialog-divider">
+            <section aria-labelledby="manage-chores-title">
+                <h3 id="manage-chores-title">업무 관리</h3>
+                <p class="form-help">업무를 비활성화해도 이미 생성된 회차와 과거 이력은 유지됩니다.</p>
+                <div id="manage-chore-list" class="chore-management-list">
+                    업무를 불러오는 중...
+                </div>
+            </section>
         </form>
     </dialog>
 </main>
