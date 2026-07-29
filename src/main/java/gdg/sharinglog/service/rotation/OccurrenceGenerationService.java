@@ -60,9 +60,21 @@ public class OccurrenceGenerationService {
         }
 
         OccurrenceSchedule schedule = scheduleResolver.resolve(chore, referenceInstant);
-        return occurrenceRepository
-                .findByChore_IdAndPeriodStart(chore.getId(), schedule.periodStart())
-                .orElseGet(() -> createAndAssign(chore, schedule, referenceInstant));
+        var exactOccurrence = occurrenceRepository
+                .findByChore_IdAndPeriodStart(chore.getId(), schedule.periodStart());
+        if (exactOccurrence.isPresent()) {
+            return exactOccurrence.get();
+        }
+
+        var latestOccurrence = occurrenceRepository
+                .findFirstByChore_IdOrderByPeriodEndExclusiveDescIdDesc(chore.getId());
+        if (latestOccurrence.isPresent()
+                && schedule.periodStart().isBefore(
+                        latestOccurrence.get().getPeriodEndExclusive()
+                )) {
+            return latestOccurrence.get();
+        }
+        return createAndAssign(chore, schedule, referenceInstant);
     }
 
     private ChoreOccurrence createAndAssign(

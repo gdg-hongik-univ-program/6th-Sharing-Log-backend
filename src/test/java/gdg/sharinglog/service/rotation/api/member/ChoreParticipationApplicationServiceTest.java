@@ -26,6 +26,7 @@ import gdg.sharinglog.service.rotation.ChoreEnrollmentService;
 import gdg.sharinglog.service.rotation.RotationAssignmentService;
 import gdg.sharinglog.service.rotation.access.RotationActor;
 import gdg.sharinglog.service.rotation.access.RotationActorAccessService;
+import gdg.sharinglog.service.rotation.api.substitute.SubstituteRequestLifecycleService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -68,6 +69,9 @@ class ChoreParticipationApplicationServiceTest {
 
     @Mock
     RotationAssignmentService assignmentService;
+
+    @Mock
+    SubstituteRequestLifecycleService substituteRequestLifecycleService;
 
     @Mock
     OAuth2User principal;

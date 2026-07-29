@@ -175,12 +175,48 @@ public class Chore {
         this.active = true;
     }
 
+    public void rename(String name) {
+        this.name = normalizeName(name);
+    }
+
+    public void reschedule(
+            ChoreFrequency frequency,
+            LocalTime dueTime,
+            DayOfWeek weeklyDueDay,
+            LocalDate biweeklyAnchorDate
+    ) {
+        ChoreFrequency requiredFrequency =
+                Objects.requireNonNull(frequency, "반복 주기는 필수입니다.");
+        LocalTime requiredDueTime =
+                Objects.requireNonNull(dueTime, "마감 시각은 필수입니다.");
+        validateSchedule(
+                group,
+                requiredFrequency,
+                weeklyDueDay,
+                biweeklyAnchorDate
+        );
+        this.frequency = requiredFrequency;
+        this.dueTime = requiredDueTime;
+        this.weeklyDueDay = weeklyDueDay;
+        this.biweeklyAnchorDate = biweeklyAnchorDate;
+    }
+
     public void recordEnrollmentChange() {
         this.eligibilityRevision = Math.incrementExact(this.eligibilityRevision);
     }
 
     private void validateSchedule() {
-        switch (frequency) {
+        validateSchedule(group, frequency, weeklyDueDay, biweeklyAnchorDate);
+    }
+
+    private static void validateSchedule(
+            SharingGroup group,
+            ChoreFrequency frequency,
+            DayOfWeek weeklyDueDay,
+            LocalDate biweeklyAnchorDate
+    ) {
+        SharingGroup requiredGroup = Objects.requireNonNull(group, "그룹은 필수입니다.");
+        switch (Objects.requireNonNull(frequency, "반복 주기는 필수입니다.")) {
             case DAILY -> {
                 requireNull(weeklyDueDay, "일간 업무에는 주간 마감 요일을 설정할 수 없습니다.");
                 requireNull(biweeklyAnchorDate, "일간 업무에는 격주 기준일을 설정할 수 없습니다.");
@@ -192,7 +228,7 @@ public class Chore {
             case BIWEEKLY -> {
                 requireNull(weeklyDueDay, "격주 업무에는 주간 마감 요일을 설정할 수 없습니다.");
                 Objects.requireNonNull(biweeklyAnchorDate, "격주 기준일은 필수입니다.");
-                if (biweeklyAnchorDate.getDayOfWeek() != group.getWeekStartsOn()) {
+                if (biweeklyAnchorDate.getDayOfWeek() != requiredGroup.getWeekStartsOn()) {
                     throw new IllegalArgumentException("격주 기준일은 그룹의 주 시작 요일과 같아야 합니다.");
                 }
             }

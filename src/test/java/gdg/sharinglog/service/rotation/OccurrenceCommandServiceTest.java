@@ -2,6 +2,7 @@ package gdg.sharinglog.service.rotation;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -15,6 +16,7 @@ import gdg.sharinglog.domain.OAuthProvider;
 import gdg.sharinglog.domain.SharingGroup;
 import gdg.sharinglog.domain.User;
 import gdg.sharinglog.domain.rotation.AssignmentEndReason;
+import gdg.sharinglog.domain.rotation.AssignmentTrigger;
 import gdg.sharinglog.domain.rotation.Chore;
 import gdg.sharinglog.domain.rotation.ChoreEligibleMember;
 import gdg.sharinglog.domain.rotation.ChoreEligibilityMode;
@@ -87,6 +89,39 @@ class OccurrenceCommandServiceTest {
         assertEquals(1, assignmentRepository.countByOccurrence_Id(occurrence.getId()));
         assertEquals(
                 1,
+                assignmentRepository.countCompletedForChoreAndMember(
+                        occurrence.getChore().getId(),
+                        assignee.getId()
+                )
+        );
+    }
+
+    @Test
+    void undoCompletionReopensForSameMemberAndRemovesCompletionCredit() {
+        Context context = context("undo-complete");
+        ChoreOccurrence occurrence = generate(context);
+        GroupMember assignee = occurrence.currentAssignee().orElseThrow();
+
+        commandService.complete(occurrence.getPublicId(), assignee.getPublicId(), ACTION_AT);
+        commandService.undoCompletion(
+                occurrence.getPublicId(),
+                assignee.getPublicId(),
+                ACTION_AT.plusSeconds(30),
+                "완료 버튼을 잘못 눌렀어요."
+        );
+
+        var attempts = assignmentRepository
+                .findAllByOccurrence_IdOrderBySequenceNumber(occurrence.getId());
+        assertEquals(OccurrenceStatus.ASSIGNED, occurrence.getStatus());
+        assertEquals(assignee.getId(), occurrence.currentAssignee().orElseThrow().getId());
+        assertEquals(2, attempts.size());
+        assertNotNull(attempts.getFirst().getCompletionRevokedAt());
+        assertEquals(
+                AssignmentTrigger.COMPLETION_REOPENED,
+                attempts.getLast().getTrigger()
+        );
+        assertEquals(
+                0,
                 assignmentRepository.countCompletedForChoreAndMember(
                         occurrence.getChore().getId(),
                         assignee.getId()

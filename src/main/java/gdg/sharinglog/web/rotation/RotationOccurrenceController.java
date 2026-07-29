@@ -12,6 +12,7 @@ import gdg.sharinglog.service.rotation.api.occurrence.OccurrenceActionApplicatio
 import gdg.sharinglog.service.rotation.api.occurrence.OccurrenceQueryService;
 import gdg.sharinglog.web.rotation.dto.OccurrenceActionRequest;
 import gdg.sharinglog.web.rotation.dto.OccurrenceActionResponse;
+import gdg.sharinglog.web.rotation.dto.CompletedOccurrenceHistoryResponse;
 import gdg.sharinglog.web.rotation.dto.OccurrenceListResponse;
 import gdg.sharinglog.web.rotation.dto.RetryAssignmentRequest;
 import gdg.sharinglog.web.rotation.http.ExpectedVersion;
@@ -150,6 +151,52 @@ public class RotationOccurrenceController {
                 ifMatch,
                 effectiveBody,
                 () -> actionService.decline(
+                        groupId,
+                        occurrenceId,
+                        authentication.getAuthorizedClientRegistrationId(),
+                        authentication.getPrincipal(),
+                        ExpectedVersion.parse(ifMatch).value(),
+                        effectiveBody.note(),
+                        Instant.now()
+                )
+        );
+    }
+
+    @GetMapping("/completed-history")
+    public CompletedOccurrenceHistoryResponse completedHistory(
+            @PathVariable String groupId,
+            @RequestParam(defaultValue = "false") boolean mineOnly,
+            @RequestParam(required = false) String choreId,
+            OAuth2AuthenticationToken authentication
+    ) {
+        return queryService.findCompletedHistory(
+                groupId,
+                authentication.getAuthorizedClientRegistrationId(),
+                authentication.getPrincipal(),
+                mineOnly,
+                choreId
+        );
+    }
+
+    @PostMapping("/{occurrenceId}/undo-complete")
+    public ResponseEntity<OccurrenceActionResponse> undoComplete(
+            @PathVariable String groupId,
+            @PathVariable String occurrenceId,
+            @Valid @RequestBody(required = false) OccurrenceActionRequest body,
+            @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey,
+            @RequestHeader(name = "If-Match", required = false) String ifMatch,
+            OAuth2AuthenticationToken authentication,
+            HttpServletRequest request
+    ) {
+        OccurrenceActionRequest effectiveBody =
+                body == null ? new OccurrenceActionRequest(null) : body;
+        return executeAction(
+                request,
+                authentication,
+                idempotencyKey,
+                ifMatch,
+                effectiveBody,
+                () -> actionService.undoCompletion(
                         groupId,
                         occurrenceId,
                         authentication.getAuthorizedClientRegistrationId(),

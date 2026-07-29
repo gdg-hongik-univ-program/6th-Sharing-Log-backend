@@ -32,12 +32,19 @@ public interface ChoreAssignmentAttemptRepository
             AssignmentEndReason endReason
     );
 
+    boolean existsByOccurrence_IdAndAssignee_IdAndEndReasonIn(
+            Long occurrenceId,
+            Long assigneeId,
+            java.util.Collection<AssignmentEndReason> endReasons
+    );
+
     @Query("""
             select count(attempt)
             from ChoreAssignmentAttempt attempt
             where attempt.occurrence.chore.id = :choreId
               and attempt.assignee.id = :membershipId
               and attempt.endReason = gdg.sharinglog.domain.rotation.AssignmentEndReason.COMPLETED
+              and attempt.completionRevokedAt is null
             """)
     long countCompletedForChoreAndMember(
             @Param("choreId") Long choreId,
@@ -55,6 +62,7 @@ public interface ChoreAssignmentAttemptRepository
                     attempt.endReason is null
                     or attempt.endReason =
                        gdg.sharinglog.domain.rotation.AssignmentEndReason.COMPLETED
+                       and attempt.completionRevokedAt is null
               )
             """)
     long countActiveOrCompletedPeriodLoad(

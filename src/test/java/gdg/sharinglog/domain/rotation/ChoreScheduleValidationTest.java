@@ -1,6 +1,7 @@
 package gdg.sharinglog.domain.rotation;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.time.DayOfWeek;
@@ -81,6 +82,35 @@ class ChoreScheduleValidationTest {
                 IllegalArgumentException.class,
                 () -> new ChoreEligibleMember(chore, otherMembership)
         );
+    }
+
+    @Test
+    void renamesAndReschedulesWithFrequencySpecificFields() {
+        User owner = user("update-owner");
+        SharingGroup group = new SharingGroup("우리 집", owner);
+        GroupMember membership = GroupMember.owner(group, owner);
+        Chore chore = Chore.daily(
+                group,
+                membership,
+                "설거지",
+                ChoreEligibilityMode.ALL_ACTIVE_MEMBERS,
+                LocalTime.of(22, 0),
+                Instant.parse("2026-07-23T00:00:00Z")
+        );
+
+        chore.rename("  공용 욕실 청소  ");
+        chore.reschedule(
+                ChoreFrequency.WEEKLY,
+                LocalTime.of(19, 30),
+                DayOfWeek.SATURDAY,
+                null
+        );
+
+        assertEquals("공용 욕실 청소", chore.getName());
+        assertEquals(ChoreFrequency.WEEKLY, chore.getFrequency());
+        assertEquals(LocalTime.of(19, 30), chore.getDueTime());
+        assertEquals(DayOfWeek.SATURDAY, chore.getWeeklyDueDay());
+        assertNull(chore.getBiweeklyAnchorDate());
     }
 
     private User user(String providerUserId) {

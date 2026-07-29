@@ -16,6 +16,12 @@
             <p class="copy">공정성 점수가 같은 후보 사이에서만 무작위로 담당자를 정해요.</p>
         </div>
         <div class="rotation-header-actions">
+            <button id="open-completed-history" class="secondary-button" type="button">
+                완료 이력
+            </button>
+            <button id="open-substitute-requests" class="secondary-button" type="button">
+                대타 요청함
+            </button>
             <button id="open-manage-rotation" class="secondary-button" type="button" hidden>
                 로테이션 관리
             </button>
@@ -153,6 +159,90 @@
                 </div>
             </section>
         </form>
+    </dialog>
+
+    <dialog id="edit-chore-dialog"
+            class="rotation-dialog"
+            aria-labelledby="edit-chore-title">
+        <form id="edit-chore-form">
+            <div class="dialog-heading">
+                <div>
+                    <p class="eyebrow">EDIT CHORE</p>
+                    <h2 id="edit-chore-title">업무 수정</h2>
+                </div>
+                <button id="close-edit-chore" class="icon-button" type="button" aria-label="닫기">×</button>
+            </div>
+            <label>업무 이름
+                <input id="edit-chore-name" maxlength="100" required>
+            </label>
+            <label>반복
+                <select id="edit-chore-frequency">
+                    <option value="DAILY">매일</option>
+                    <option value="WEEKLY">매주</option>
+                    <option value="BIWEEKLY">격주</option>
+                </select>
+            </label>
+            <label>마감 시각
+                <input id="edit-chore-due-time" type="time" required>
+            </label>
+            <label id="edit-weekly-day-field" hidden>마감 요일
+                <select id="edit-chore-weekly-day">
+                    <option value="MONDAY">월요일</option>
+                    <option value="TUESDAY">화요일</option>
+                    <option value="WEDNESDAY">수요일</option>
+                    <option value="THURSDAY">목요일</option>
+                    <option value="FRIDAY">금요일</option>
+                    <option value="SATURDAY">토요일</option>
+                    <option value="SUNDAY">일요일</option>
+                </select>
+            </label>
+            <label id="edit-biweekly-anchor-field" hidden>격주 시작일
+                <input id="edit-chore-biweekly-anchor" type="date">
+            </label>
+            <button class="primary-button full-button" type="submit">변경 저장</button>
+            <p id="edit-chore-status" class="rotation-status" role="status"></p>
+        </form>
+    </dialog>
+
+    <dialog id="substitute-requests-dialog"
+            class="rotation-dialog rotation-dialog-wide"
+            aria-labelledby="substitute-requests-title">
+        <div class="dialog-heading">
+            <div>
+                <p class="eyebrow">SUBSTITUTE REQUESTS</p>
+                <h2 id="substitute-requests-title">대타 요청함</h2>
+            </div>
+            <button id="close-substitute-requests" class="icon-button" type="button" aria-label="닫기">×</button>
+        </div>
+        <label>보기
+            <select id="substitute-request-box">
+                <option value="INBOX">받은 요청</option>
+                <option value="OUTBOX">보낸 요청</option>
+                <option value="ALL">전체 요청</option>
+            </select>
+        </label>
+        <p id="substitute-request-status"
+           class="rotation-status"
+           role="status"
+           aria-live="polite"></p>
+        <section id="substitute-request-list" class="workflow-list"></section>
+    </dialog>
+
+    <dialog id="completed-history-dialog"
+            class="rotation-dialog rotation-dialog-wide"
+            aria-labelledby="completed-history-title">
+        <div class="dialog-heading">
+            <div>
+                <p class="eyebrow">COMPLETED HISTORY</p>
+                <h2 id="completed-history-title">전체 완료 업무 이력</h2>
+            </div>
+            <button id="close-completed-history" class="icon-button" type="button" aria-label="닫기">×</button>
+        </div>
+        <p id="completed-history-status"
+           class="rotation-status"
+           role="status"
+           aria-live="polite"></p>
+        <section id="completed-history-list" class="workflow-list"></section>
     </dialog>
 </main>
 </body>

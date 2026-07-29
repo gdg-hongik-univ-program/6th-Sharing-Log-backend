@@ -24,6 +24,7 @@ import gdg.sharinglog.service.rotation.ChoreEnrollmentService;
 import gdg.sharinglog.service.rotation.RotationAssignmentService;
 import gdg.sharinglog.service.rotation.access.RotationActor;
 import gdg.sharinglog.service.rotation.access.RotationActorAccessService;
+import gdg.sharinglog.service.rotation.api.substitute.SubstituteRequestLifecycleService;
 import gdg.sharinglog.web.rotation.error.RotationConflictException;
 import gdg.sharinglog.web.rotation.error.RotationNotFoundException;
 import gdg.sharinglog.web.rotation.error.RotationProblemCode;
@@ -40,6 +41,7 @@ public class ChoreParticipationApplicationService {
     private final OccurrenceEligibleMemberRepository eligibilityRepository;
     private final ChoreEnrollmentService enrollmentService;
     private final RotationAssignmentService assignmentService;
+    private final SubstituteRequestLifecycleService substituteRequestLifecycleService;
 
     public ChoreParticipationApplicationService(
             RotationActorAccessService accessService,
@@ -47,7 +49,8 @@ public class ChoreParticipationApplicationService {
             ChoreOccurrenceRepository occurrenceRepository,
             OccurrenceEligibleMemberRepository eligibilityRepository,
             ChoreEnrollmentService enrollmentService,
-            RotationAssignmentService assignmentService
+            RotationAssignmentService assignmentService,
+            SubstituteRequestLifecycleService substituteRequestLifecycleService
     ) {
         this.accessService = accessService;
         this.choreRepository = choreRepository;
@@ -55,6 +58,7 @@ public class ChoreParticipationApplicationService {
         this.eligibilityRepository = eligibilityRepository;
         this.enrollmentService = enrollmentService;
         this.assignmentService = assignmentService;
+        this.substituteRequestLifecycleService = substituteRequestLifecycleService;
     }
 
     @Transactional
@@ -217,8 +221,18 @@ public class ChoreParticipationApplicationService {
                             && occurrence.getStatus() == OccurrenceStatus.NEEDS_ATTENTION;
 
             if (assignedTargetRemoved) {
+                substituteRequestLifecycleService.cancelPendingForOccurrence(
+                        occurrence,
+                        changedAt
+                );
                 occurrence.releaseForReassignment(
                         AssignmentEndReason.PARTICIPATION_REMOVED,
+                        changedAt
+                );
+            } else if (action == UpdatedChoreParticipations.Action.REMOVE) {
+                substituteRequestLifecycleService.invalidatePendingForOccurrenceAndMember(
+                        occurrence,
+                        target,
                         changedAt
                 );
             }

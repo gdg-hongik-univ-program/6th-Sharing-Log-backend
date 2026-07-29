@@ -61,6 +61,9 @@ public class ChoreOccurrence {
     )
     private Chore chore;
 
+    @Column(name = "chore_name_snapshot", nullable = false, length = 100)
+    private String choreNameSnapshot;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "frequency_snapshot", nullable = false, length = 20)
     private ChoreFrequency frequencySnapshot;
@@ -120,6 +123,7 @@ public class ChoreOccurrence {
             Instant createdAt
     ) {
         this.chore = Objects.requireNonNull(chore, "업무는 필수입니다.");
+        this.choreNameSnapshot = chore.getName();
         this.frequencySnapshot = chore.getFrequency();
         this.timeZoneIdSnapshot = chore.getGroup().getTimeZoneId();
         this.periodStart = Objects.requireNonNull(periodStart, "기간 시작일은 필수입니다.");
@@ -280,6 +284,20 @@ public class ChoreOccurrence {
             throw new IllegalStateException("종료된 회차의 가능 멤버 조건은 갱신할 수 없습니다.");
         }
         eligibilitySnapshotVersion++;
+    }
+
+    public void reopenCompleted(ChoreAssignmentAttempt assignment, Instant reopenedAt) {
+        if (status != OccurrenceStatus.COMPLETED || currentAssignment != null) {
+            throw new IllegalStateException("완료된 회차만 다시 열 수 있습니다.");
+        }
+        Instant effectiveReopenedAt =
+                Objects.requireNonNull(reopenedAt, "완료 취소 시각은 필수입니다.");
+        if (closedAt == null || effectiveReopenedAt.isBefore(closedAt)) {
+            throw new IllegalArgumentException("완료 취소 시각은 완료 시각보다 빠를 수 없습니다.");
+        }
+        this.status = OccurrenceStatus.NEEDS_ATTENTION;
+        this.closedAt = null;
+        assign(assignment);
     }
 
     private void close(

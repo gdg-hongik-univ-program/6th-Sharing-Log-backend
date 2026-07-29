@@ -79,6 +79,9 @@ public interface ChoreOccurrenceRepository extends JpaRepository<ChoreOccurrence
             LocalDate periodStart
     );
 
+    Optional<ChoreOccurrence>
+    findFirstByChore_IdOrderByPeriodEndExclusiveDescIdDesc(Long choreId);
+
     @EntityGraph(attributePaths = {"chore", "currentAssignment", "currentAssignment.assignee"})
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     List<ChoreOccurrence> findAllByCurrentAssignment_Assignee_IdAndStatusOrderByIdAsc(
@@ -128,5 +131,12 @@ public interface ChoreOccurrenceRepository extends JpaRepository<ChoreOccurrence
     List<ChoreOccurrence> findAllActiveOn(
             @Param("groupId") Long groupId,
             @Param("activeOn") LocalDate activeOn
+    );
+
+    @EntityGraph(attributePaths = {"chore"})
+    List<ChoreOccurrence>
+    findAllByChore_Group_IdAndStatusOrderByClosedAtDescIdDesc(
+            Long groupId,
+            OccurrenceStatus status
     );
 }

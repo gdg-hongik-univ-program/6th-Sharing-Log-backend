@@ -14,6 +14,7 @@ import gdg.sharinglog.domain.rotation.OccurrenceEligibleMember;
 import gdg.sharinglog.domain.rotation.OccurrenceStatus;
 import gdg.sharinglog.repository.GroupMemberRepository;
 import gdg.sharinglog.repository.rotation.ChoreEligibleMemberRepository;
+import gdg.sharinglog.repository.rotation.ChoreAssignmentAttemptRepository;
 import gdg.sharinglog.repository.rotation.ChoreOccurrenceRepository;
 import gdg.sharinglog.repository.rotation.ChoreRepository;
 import gdg.sharinglog.repository.rotation.OccurrenceEligibleMemberRepository;
@@ -40,6 +41,7 @@ public class OccurrenceActionApplicationService {
     private final ChoreRepository choreRepository;
     private final GroupMemberRepository groupMemberRepository;
     private final ChoreEligibleMemberRepository choreEligibleMemberRepository;
+    private final ChoreAssignmentAttemptRepository assignmentRepository;
     private final OccurrenceEligibleMemberRepository occurrenceEligibleMemberRepository;
     private final OccurrenceCommandService commandService;
     private final RotationAssignmentService assignmentService;
@@ -51,6 +53,7 @@ public class OccurrenceActionApplicationService {
             ChoreRepository choreRepository,
             GroupMemberRepository groupMemberRepository,
             ChoreEligibleMemberRepository choreEligibleMemberRepository,
+            ChoreAssignmentAttemptRepository assignmentRepository,
             OccurrenceEligibleMemberRepository occurrenceEligibleMemberRepository,
             OccurrenceCommandService commandService,
             RotationAssignmentService assignmentService,
@@ -61,6 +64,7 @@ public class OccurrenceActionApplicationService {
         this.choreRepository = choreRepository;
         this.groupMemberRepository = groupMemberRepository;
         this.choreEligibleMemberRepository = choreEligibleMemberRepository;
+        this.assignmentRepository = assignmentRepository;
         this.occurrenceEligibleMemberRepository = occurrenceEligibleMemberRepository;
         this.commandService = commandService;
         this.assignmentService = assignmentService;
@@ -147,6 +151,48 @@ public class OccurrenceActionApplicationService {
                         ? OccurrenceActionResponse.Outcome.REASSIGNED
                         : OccurrenceActionResponse.Outcome.NEEDS_ATTENTION;
         return response(outcome, occurrence, null, null);
+    }
+
+    @Transactional
+    public OccurrenceActionResponse undoCompletion(
+            String groupPublicId,
+            String occurrencePublicId,
+            String registrationId,
+            OAuth2User principal,
+            long expectedVersion,
+            String note,
+            Instant actedAt
+    ) {
+        RotationActor actor =
+                accessService.requireActiveMemberForUpdate(groupPublicId, registrationId, principal);
+        ChoreOccurrence occurrence = lockedOccurrence(groupPublicId, occurrencePublicId);
+        requireVersion(occurrence, expectedVersion);
+        requireStatus(occurrence, OccurrenceStatus.COMPLETED);
+        boolean completedByActor = assignmentRepository
+                .findFirstByOccurrence_IdOrderBySequenceNumberDesc(occurrence.getId())
+                .filter(assignment -> assignment.isEffectiveCompletion()
+                        && assignment.getAssignee().getId()
+                        .equals(actor.membership().getId()))
+                .isPresent();
+        if (!completedByActor) {
+            throw new RotationForbiddenException(
+                    RotationProblemCode.FORBIDDEN,
+                    "Only the member who completed this occurrence can undo it.",
+                    Map.of("resourceId", occurrencePublicId)
+            );
+        }
+        ChoreOccurrence reopened = commandService.undoCompletion(
+                occurrencePublicId,
+                actor.membership().getPublicId(),
+                actedAt,
+                note
+        );
+        return response(
+                OccurrenceActionResponse.Outcome.COMPLETION_UNDONE,
+                reopened,
+                null,
+                null
+        );
     }
 
     @Transactional

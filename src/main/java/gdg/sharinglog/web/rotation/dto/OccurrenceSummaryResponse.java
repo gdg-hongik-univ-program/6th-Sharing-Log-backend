@@ -29,6 +29,8 @@ public record OccurrenceSummaryResponse(
         COMPLETE,
         SKIP_ALREADY_DONE,
         DECLINE,
-        RETRY_ASSIGNMENT
+        REQUEST_SUBSTITUTE,
+        RETRY_ASSIGNMENT,
+        UNDO_COMPLETE
     }
 }

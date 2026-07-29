@@ -3,6 +3,7 @@ package gdg.sharinglog.service.rotation.api.chore;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -18,6 +19,9 @@ import gdg.sharinglog.service.rotation.OccurrenceGenerationService;
 import gdg.sharinglog.service.rotation.access.RotationActor;
 import gdg.sharinglog.service.rotation.access.RotationActorAccessService;
 import gdg.sharinglog.service.rotation.access.RotationMemberNotFoundException;
+import gdg.sharinglog.web.rotation.error.RotationConflictException;
+import gdg.sharinglog.web.rotation.error.RotationNotFoundException;
+import gdg.sharinglog.web.rotation.error.RotationProblemCode;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -82,6 +86,55 @@ public class ChoreApplicationService {
                 .filter(chore -> active == null || chore.isActive() == active)
                 .map(chore -> new ChoreView(chore, currentEligibleMembers(chore)))
                 .toList();
+    }
+
+    @Transactional
+    public ChoreView update(
+            String groupPublicId,
+            String chorePublicId,
+            String registrationId,
+            OAuth2User principal,
+            UpdateChoreCommand command,
+            long expectedVersion
+    ) {
+        Objects.requireNonNull(command, "업무 수정 명령은 필수입니다.");
+        RotationActor actor =
+                accessService.requireOwnerForUpdate(groupPublicId, registrationId, principal);
+        Chore chore = choreRepository
+                .findByPublicIdAndGroupPublicIdForUpdate(chorePublicId, groupPublicId)
+                .orElseThrow(() -> new RotationNotFoundException(
+                        "The requested chore was not found."
+                ));
+        if (chore.getVersion() != expectedVersion) {
+            throw new RotationConflictException(
+                    RotationProblemCode.VERSION_CONFLICT,
+                    "The chore changed. Reload it and try again.",
+                    Map.of(
+                            "resourceId", chore.getPublicId(),
+                            "expectedVersion", expectedVersion,
+                            "currentVersion", chore.getVersion()
+                    )
+            );
+        }
+        if (!chore.getGroup().getId().equals(actor.group().getId())) {
+            throw new IllegalStateException("잠긴 업무와 접근 그룹이 일치하지 않습니다.");
+        }
+
+        if (command.name() != null) {
+            chore.rename(command.name());
+        }
+        if (command.schedule() != null) {
+            UpdateChoreCommand.Schedule schedule = command.schedule();
+            chore.reschedule(
+                    schedule.frequency(),
+                    schedule.dueTime(),
+                    schedule.weeklyDueDay(),
+                    schedule.biweeklyAnchorDate()
+            );
+        }
+
+        Chore updated = choreRepository.saveAndFlush(chore);
+        return new ChoreView(updated, currentEligibleMembers(updated));
     }
 
     private Chore createChore(
