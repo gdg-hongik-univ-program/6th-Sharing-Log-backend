@@ -13,6 +13,8 @@ import gdg.sharinglog.service.rotation.access.RotationActor;
 import gdg.sharinglog.service.rotation.access.RotationActorAccessService;
 import gdg.sharinglog.web.rotation.RotationViewMapper;
 import gdg.sharinglog.web.rotation.dto.OccurrenceListResponse;
+import gdg.sharinglog.web.rotation.dto.CompletedOccurrenceHistoryResponse;
+import gdg.sharinglog.repository.rotation.ChoreAssignmentAttemptRepository;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,15 +24,18 @@ public class OccurrenceQueryService {
 
     private final RotationActorAccessService accessService;
     private final ChoreOccurrenceRepository occurrenceRepository;
+    private final ChoreAssignmentAttemptRepository assignmentRepository;
     private final RotationViewMapper viewMapper;
 
     public OccurrenceQueryService(
             RotationActorAccessService accessService,
             ChoreOccurrenceRepository occurrenceRepository,
+            ChoreAssignmentAttemptRepository assignmentRepository,
             RotationViewMapper viewMapper
     ) {
         this.accessService = accessService;
         this.occurrenceRepository = occurrenceRepository;
+        this.assignmentRepository = assignmentRepository;
         this.viewMapper = viewMapper;
     }
 
@@ -77,11 +82,50 @@ public class OccurrenceQueryService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public CompletedOccurrenceHistoryResponse findCompletedHistory(
+            String groupPublicId,
+            String registrationId,
+            OAuth2User principal,
+            boolean mineOnly,
+            String chorePublicId
+    ) {
+        RotationActor actor =
+                accessService.requireActiveMember(groupPublicId, registrationId, principal);
+        List<ChoreOccurrence> completed = occurrenceRepository
+                .findAllByChore_Group_IdAndStatusOrderByClosedAtDescIdDesc(
+                        actor.group().getId(),
+                        OccurrenceStatus.COMPLETED
+                )
+                .stream()
+                .filter(item -> chorePublicId == null
+                        || item.getChore().getPublicId().equals(chorePublicId))
+                .filter(item -> !mineOnly || completedBy(item, actor.membership()))
+                .toList();
+        var items = completed.stream()
+                .map(item -> viewMapper.occurrence(item, actor))
+                .toList();
+        return new CompletedOccurrenceHistoryResponse(
+                actor.group().getPublicId(),
+                mineOnly,
+                items,
+                items.size()
+        );
+    }
+
     private boolean isCurrentAssignee(ChoreOccurrence occurrence, GroupMember actor) {
         return occurrence.getStatus() == OccurrenceStatus.ASSIGNED
                 && occurrence.currentAssignee()
                 .map(GroupMember::getId)
                 .filter(actor.getId()::equals)
+                .isPresent();
+    }
+
+    private boolean completedBy(ChoreOccurrence occurrence, GroupMember actor) {
+        return assignmentRepository
+                .findFirstByOccurrence_IdOrderBySequenceNumberDesc(occurrence.getId())
+                .filter(assignment -> assignment.isEffectiveCompletion()
+                        && assignment.getAssignee().getId().equals(actor.getId()))
                 .isPresent();
     }
 }

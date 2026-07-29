@@ -52,6 +52,26 @@ public enum RotationProblemCode {
             "현재 회차 상태에서는 요청을 수행할 수 없습니다.",
             "회차의 최신 상태를 확인해 주세요."
     ),
+    INVALID_SUBSTITUTE_REQUEST_STATE(
+            HttpStatus.CONFLICT,
+            "현재 대타 요청 상태에서는 처리할 수 없습니다.",
+            "대타 요청과 회차의 최신 상태를 확인해 주세요."
+    ),
+    SUBSTITUTE_REQUEST_ALREADY_EXISTS(
+            HttpStatus.CONFLICT,
+            "이미 진행 중인 대타 요청이 있습니다.",
+            "기존 대타 요청의 응답 상태를 확인해 주세요."
+    ),
+    NO_SUBSTITUTE_CANDIDATE(
+            HttpStatus.CONFLICT,
+            "대타 요청을 받을 수 있는 멤버가 없습니다.",
+            "현재 회차의 가능 멤버를 확인해 주세요."
+    ),
+    NOT_SUBSTITUTE_RECIPIENT(
+            HttpStatus.FORBIDDEN,
+            "이 대타 요청에 응답할 수 없습니다.",
+            "현재 계정이 요청 대상인지 확인해 주세요."
+    ),
     IDEMPOTENCY_KEY_REUSED(
             HttpStatus.CONFLICT,
             "멱등 키가 다른 요청에 이미 사용되었습니다.",

@@ -36,6 +36,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class RotationAssignmentService {
 
     public static final String ALGORITHM_VERSION = "fair-random-v2";
+    private static final List<AssignmentEndReason> SAME_OCCURRENCE_EXCLUSIONS =
+            List.of(
+                    AssignmentEndReason.DECLINED_BY_ASSIGNEE,
+                    AssignmentEndReason.SUBSTITUTE_ACCEPTED
+            );
 
     private final SharingGroupRepository sharingGroupRepository;
     private final GroupMemberRepository groupMemberRepository;
@@ -195,10 +200,10 @@ public class RotationAssignmentService {
     ) {
         if (!selectedMember.isActive()
                 || !belongsToSnapshot(selectedMember, eligibleActivationGenerations)
-                || assignmentRepository.existsByOccurrence_IdAndAssignee_IdAndEndReason(
+                || assignmentRepository.existsByOccurrence_IdAndAssignee_IdAndEndReasonIn(
                         occurrence.getId(),
                         selectedMember.getId(),
-                        AssignmentEndReason.DECLINED_BY_ASSIGNEE
+                        SAME_OCCURRENCE_EXCLUSIONS
                 )) {
             throw new IllegalStateException("배정 직전 검증에서 유효하지 않은 후보가 선택되었습니다.");
         }
@@ -269,18 +274,18 @@ public class RotationAssignmentService {
                 occurrence.getPeriodStart(),
                 member.getId()
         );
-        boolean declined = assignmentRepository
-                .existsByOccurrence_IdAndAssignee_IdAndEndReason(
+        boolean declinedOrSubstituted = assignmentRepository
+                .existsByOccurrence_IdAndAssignee_IdAndEndReasonIn(
                         occurrence.getId(),
                         member.getId(),
-                        AssignmentEndReason.DECLINED_BY_ASSIGNEE
+                        SAME_OCCURRENCE_EXCLUSIONS
                 );
 
         return new RotationCandidate(
                 member.getId(),
                 member.isActive(),
                 eligible,
-                declined,
+                declinedOrSubstituted,
                 completedSameChoreCount,
                 fairnessCredit,
                 Math.toIntExact(activePeriodLoad),

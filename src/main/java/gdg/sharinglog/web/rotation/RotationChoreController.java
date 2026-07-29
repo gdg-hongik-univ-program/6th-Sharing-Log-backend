@@ -7,11 +7,14 @@ import gdg.sharinglog.domain.rotation.ChoreFrequency;
 import gdg.sharinglog.service.rotation.api.chore.ChoreApplicationService;
 import gdg.sharinglog.service.rotation.api.chore.ChoreLifecycleApplicationService;
 import gdg.sharinglog.service.rotation.api.chore.CreateChoreCommand;
+import gdg.sharinglog.service.rotation.api.chore.UpdateChoreCommand;
 import gdg.sharinglog.service.rotation.api.idempotency.CommandResponse;
 import gdg.sharinglog.service.rotation.api.idempotency.IdempotentCommandExecutor;
 import gdg.sharinglog.web.rotation.dto.ChoreListResponse;
 import gdg.sharinglog.web.rotation.dto.CreateChoreRequest;
 import gdg.sharinglog.web.rotation.dto.CreateChoreResponse;
+import gdg.sharinglog.web.rotation.dto.ChoreResponse;
+import gdg.sharinglog.web.rotation.dto.UpdateChoreRequest;
 import gdg.sharinglog.web.rotation.error.RotationBadRequestException;
 import gdg.sharinglog.web.rotation.error.RotationProblemCode;
 import gdg.sharinglog.web.rotation.http.ExpectedVersion;
@@ -24,6 +27,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -113,6 +117,47 @@ public class RotationChoreController {
         return new ChoreListResponse(items, null, false);
     }
 
+    @PatchMapping("/{choreId}")
+    public ResponseEntity<ChoreResponse> update(
+            @PathVariable String groupId,
+            @PathVariable String choreId,
+            @Valid @RequestBody UpdateChoreRequest request,
+            @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey,
+            @RequestHeader(name = "If-Match", required = false) String ifMatch,
+            OAuth2AuthenticationToken authentication,
+            HttpServletRequest servletRequest
+    ) {
+        ExpectedVersion expectedVersion = ExpectedVersion.parse(ifMatch);
+        var result = idempotentExecutor.execute(
+                authentication.getAuthorizedClientRegistrationId(),
+                authentication.getPrincipal(),
+                servletRequest.getMethod(),
+                servletRequest.getRequestURI(),
+                IdempotencyKey.parse(idempotencyKey),
+                request,
+                ifMatch,
+                ChoreResponse.class,
+                () -> {
+                    var updated = choreService.update(
+                            groupId,
+                            choreId,
+                            authentication.getAuthorizedClientRegistrationId(),
+                            authentication.getPrincipal(),
+                            toCommand(request),
+                            expectedVersion.value()
+                    );
+                    ChoreResponse body = viewMapper.chore(updated);
+                    return new CommandResponse<>(
+                            200,
+                            body,
+                            etag(body.version()),
+                            null
+                    );
+                }
+        );
+        return RotationHttpResponses.from(result);
+    }
+
     @DeleteMapping("/{choreId}")
     public ResponseEntity<Void> deactivate(
             @PathVariable String groupId,
@@ -161,6 +206,18 @@ public class RotationChoreController {
                 request.eligibility().mode(),
                 request.eligibility().membershipIds()
         );
+    }
+
+    private UpdateChoreCommand toCommand(UpdateChoreRequest request) {
+        UpdateChoreCommand.Schedule schedule = request.schedule() == null
+                ? null
+                : new UpdateChoreCommand.Schedule(
+                        request.schedule().frequency(),
+                        request.schedule().dueTime(),
+                        request.schedule().weeklyDueDay(),
+                        request.schedule().biweeklyAnchorDate()
+                );
+        return new UpdateChoreCommand(request.name(), schedule);
     }
 
     private Boolean parseActive(String value) {

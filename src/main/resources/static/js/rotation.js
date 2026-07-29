@@ -28,11 +28,28 @@
     const saveParticipationsButton = document.querySelector("#save-member-participations");
     const removeMemberButton = document.querySelector("#remove-group-member");
 
+    const editChoreDialog = document.querySelector("#edit-chore-dialog");
+    const editChoreForm = document.querySelector("#edit-chore-form");
+    const editChoreFrequency = document.querySelector("#edit-chore-frequency");
+    const editWeeklyField = document.querySelector("#edit-weekly-day-field");
+    const editBiweeklyField = document.querySelector("#edit-biweekly-anchor-field");
+    const editChoreStatus = document.querySelector("#edit-chore-status");
+
+    const substituteDialog = document.querySelector("#substitute-requests-dialog");
+    const substituteBox = document.querySelector("#substitute-request-box");
+    const substituteList = document.querySelector("#substitute-request-list");
+    const substituteStatus = document.querySelector("#substitute-request-status");
+
+    const completedHistoryDialog = document.querySelector("#completed-history-dialog");
+    const completedHistoryList = document.querySelector("#completed-history-list");
+    const completedHistoryStatus = document.querySelector("#completed-history-status");
+
     let frequency = "DAILY";
     let actorMembershipId = null;
     let canManage = false;
     let managementMembers = [];
     let managementChores = [];
+    let editingChore = null;
 
     if (!groupId) {
         status.textContent = "주소에 groupId가 필요합니다. 그룹 생성 화면에서 로테이션을 열어 주세요.";
@@ -49,11 +66,23 @@
     openManageButton.addEventListener("click", () => void openManagement());
     document.querySelector("#close-manage-rotation")
         .addEventListener("click", () => manageDialog.close());
+    document.querySelector("#open-substitute-requests")
+        .addEventListener("click", () => void openSubstituteRequests());
+    document.querySelector("#close-substitute-requests")
+        .addEventListener("click", () => substituteDialog.close());
+    document.querySelector("#open-completed-history")
+        .addEventListener("click", () => void openCompletedHistory());
+    document.querySelector("#close-completed-history")
+        .addEventListener("click", () => completedHistoryDialog.close());
+    document.querySelector("#close-edit-chore")
+        .addEventListener("click", () => editChoreDialog.close());
     manageMemberSelect.addEventListener("change", renderSelectedMemberManagement);
     removeMemberButton.addEventListener("click", () => void removeSelectedMember());
 
     frequencyInput.addEventListener("change", syncScheduleFields);
+    editChoreFrequency.addEventListener("change", syncEditScheduleFields);
     eligibilityMode.addEventListener("change", syncEligibilityField);
+    substituteBox.addEventListener("change", () => void loadSubstituteRequests());
     tabs.forEach((tab) => tab.addEventListener("click", () => {
         frequency = tab.dataset.frequency;
         tabs.forEach((item) => item.classList.toggle("is-active", item === tab));
@@ -61,9 +90,11 @@
     }));
     createForm.addEventListener("submit", createChore);
     manageForm.addEventListener("submit", saveMemberParticipations);
+    editChoreForm.addEventListener("submit", updateChore);
 
     document.querySelector("#chore-biweekly-anchor").value = mondayOfCurrentWeek();
     syncScheduleFields();
+    syncEditScheduleFields();
     syncEligibilityField();
     void loadOccurrences();
     void loadManagementCapabilities();
@@ -139,15 +170,54 @@
     }
 
     async function runAction(item, action, button) {
+        if (action === "REQUEST_SUBSTITUTE") {
+            const reason = window.prompt("대타가 필요한 이유를 입력해 주세요.", "");
+            if (reason === null) {
+                return;
+            }
+            if (!reason.trim()) {
+                status.textContent = "대타 요청 사유를 입력해 주세요.";
+                return;
+            }
+            button.disabled = true;
+            status.textContent = "대타를 요청하는 중...";
+            try {
+                await mutate(
+                    `${groupPath}/occurrences/${encodeURIComponent(item.occurrenceId)}`
+                        + "/substitute-requests",
+                    {
+                        method: "POST",
+                        body: {reason: reason.trim()},
+                        ifMatch: strongEtag(item.version)
+                    }
+                );
+                status.textContent = "대타 요청을 보냈습니다.";
+                await loadOccurrences();
+            } catch (error) {
+                status.textContent = errorMessage(error);
+                button.disabled = false;
+            }
+            return;
+        }
+
         const paths = {
             COMPLETE: "complete",
             SKIP_ALREADY_DONE: "skip-already-done",
             DECLINE: "decline",
-            RETRY_ASSIGNMENT: "retry-assignment"
+            RETRY_ASSIGNMENT: "retry-assignment",
+            UNDO_COMPLETE: "undo-complete"
         };
         let body = {};
-        if (action === "SKIP_ALREADY_DONE" || action === "DECLINE") {
+        if (action === "SKIP_ALREADY_DONE"
+            || action === "DECLINE") {
             body = {note: window.prompt("메모를 남길 수 있어요.", "") || null};
+        }
+        if (action === "UNDO_COMPLETE") {
+            const note = window.prompt("완료 취소 메모를 남길 수 있어요.", "");
+            if (note === null) {
+                return;
+            }
+            body = {note: note || null};
         }
         if (action === "RETRY_ASSIGNMENT") {
             body = {eligibilitySource: "OCCURRENCE_SNAPSHOT", sourceChoreVersion: null};
@@ -164,6 +234,9 @@
                 }
             );
             await loadOccurrences();
+            if (completedHistoryDialog.open) {
+                await loadCompletedHistory();
+            }
         } catch (error) {
             status.textContent = errorMessage(error);
             button.disabled = false;
@@ -390,16 +463,30 @@
                 badge.textContent = "비활성";
                 row.append(badge);
             } else {
-                const button = document.createElement("button");
-                button.type = "button";
-                button.className = "danger-outline-button";
-                button.textContent = "업무 비활성화";
-                button.setAttribute("aria-label", `${chore.name} 업무 비활성화`);
-                button.addEventListener(
+                const actions = document.createElement("div");
+                actions.className = "management-row-actions";
+
+                const editButton = document.createElement("button");
+                editButton.type = "button";
+                editButton.className = "secondary-button";
+                editButton.textContent = "수정";
+                editButton.setAttribute("aria-label", `${chore.name} 업무 수정`);
+                editButton.addEventListener(
                     "click",
-                    () => void deactivateChore(chore, button)
+                    () => openEditChore(chore)
                 );
-                row.append(button);
+
+                const deactivateButton = document.createElement("button");
+                deactivateButton.type = "button";
+                deactivateButton.className = "danger-outline-button";
+                deactivateButton.textContent = "비활성화";
+                deactivateButton.setAttribute("aria-label", `${chore.name} 업무 비활성화`);
+                deactivateButton.addEventListener(
+                    "click",
+                    () => void deactivateChore(chore, deactivateButton)
+                );
+                actions.append(editButton, deactivateButton);
+                row.append(actions);
             }
             return row;
         });
@@ -554,6 +641,269 @@
             + `${summary.needsAttentionCount}건 관리 필요`;
     }
 
+    function openEditChore(chore) {
+        editingChore = chore;
+        editChoreStatus.textContent =
+            "일정 변경은 이미 생성된 회차가 아니라 다음 회차부터 반영됩니다.";
+        document.querySelector("#edit-chore-name").value = chore.name;
+        editChoreFrequency.value = chore.schedule.frequency;
+        document.querySelector("#edit-chore-due-time").value =
+            (chore.schedule.dueTime || "20:00").slice(0, 5);
+        document.querySelector("#edit-chore-weekly-day").value =
+            chore.schedule.weeklyDueDay || "SUNDAY";
+        document.querySelector("#edit-chore-biweekly-anchor").value =
+            chore.schedule.biweeklyAnchorDate || mondayOfCurrentWeek();
+        syncEditScheduleFields();
+        editChoreDialog.showModal();
+    }
+
+    async function updateChore(event) {
+        event.preventDefault();
+        if (!editingChore) {
+            editChoreStatus.textContent = "수정할 업무를 다시 선택해 주세요.";
+            return;
+        }
+
+        const selectedFrequency = editChoreFrequency.value;
+        const body = {
+            name: document.querySelector("#edit-chore-name").value.trim(),
+            schedule: {
+                frequency: selectedFrequency,
+                dueTime: document.querySelector("#edit-chore-due-time").value,
+                weeklyDueDay: selectedFrequency === "WEEKLY"
+                    ? document.querySelector("#edit-chore-weekly-day").value
+                    : null,
+                biweeklyAnchorDate: selectedFrequency === "BIWEEKLY"
+                    ? document.querySelector("#edit-chore-biweekly-anchor").value
+                    : null
+            }
+        };
+        editChoreStatus.textContent = "업무를 수정하는 중...";
+        try {
+            await mutate(
+                `${groupPath}/chores/${encodeURIComponent(editingChore.choreId)}`,
+                {
+                    method: "PATCH",
+                    body,
+                    ifMatch: strongEtag(editingChore.version)
+                }
+            );
+            const selectedMembershipId = manageMemberSelect.value;
+            editChoreDialog.close();
+            editingChore = null;
+            await Promise.all([
+                loadOccurrences(),
+                loadManagementData(selectedMembershipId)
+            ]);
+            manageStatus.textContent = "업무명과 일정을 수정했습니다.";
+        } catch (error) {
+            editChoreStatus.textContent = errorMessage(error);
+        }
+    }
+
+    async function openSubstituteRequests() {
+        substituteStatus.textContent = "";
+        substituteDialog.showModal();
+        await loadSubstituteRequests();
+    }
+
+    async function loadSubstituteRequests() {
+        substituteStatus.textContent = "대타 요청을 불러오는 중...";
+        substituteList.replaceChildren();
+        try {
+            const box = substituteBox.value;
+            const response = await requestJson(
+                `${groupPath}/substitute-requests?box=${encodeURIComponent(box)}`
+            );
+            const items = Array.isArray(response.items) ? response.items : [];
+            renderSubstituteRequests(items, box);
+            substituteStatus.textContent = items.length
+                ? `${items.length}건`
+                : "표시할 대타 요청이 없습니다.";
+        } catch (error) {
+            substituteStatus.textContent = errorMessage(error);
+        }
+    }
+
+    function renderSubstituteRequests(items, box) {
+        const cards = items.map((request) => {
+            const card = document.createElement("article");
+            card.className = "workflow-card";
+
+            const heading = document.createElement("div");
+            heading.className = "occurrence-heading";
+            const title = document.createElement("div");
+            const name = document.createElement("h3");
+            name.textContent = request.choreName;
+            const period = document.createElement("p");
+            period.textContent =
+                `${request.periodStart} — ${request.periodEndExclusive}`;
+            title.append(name, period);
+            const badge = document.createElement("span");
+            badge.className = "status-badge";
+            badge.textContent = substituteRequestStatusLabel(request.status);
+            heading.append(title, badge);
+
+            const requester = document.createElement("p");
+            requester.className = "workflow-meta";
+            requester.textContent =
+                `요청자 · ${request.requester?.displayName || "알 수 없음"}`;
+            const reason = document.createElement("p");
+            reason.className = "workflow-reason";
+            reason.textContent = request.reason;
+            const recipients = document.createElement("p");
+            recipients.className = "workflow-meta";
+            recipients.textContent = (request.recipients || [])
+                .map((item) =>
+                    `${item.member.displayName}(${substituteRecipientStatusLabel(item.status)})`
+                )
+                .join(", ");
+
+            card.append(heading, requester, reason, recipients);
+            if (box === "INBOX" && request.status === "PENDING") {
+                const actions = document.createElement("div");
+                actions.className = "occurrence-actions";
+                const accept = document.createElement("button");
+                accept.type = "button";
+                accept.textContent = "수락";
+                accept.addEventListener(
+                    "click",
+                    () => void respondToSubstituteRequest(request, "accept", accept)
+                );
+                const reject = document.createElement("button");
+                reject.type = "button";
+                reject.className = "secondary-button";
+                reject.textContent = "거절";
+                reject.addEventListener(
+                    "click",
+                    () => void respondToSubstituteRequest(request, "reject", reject)
+                );
+                actions.append(accept, reject);
+                card.append(actions);
+            }
+            return card;
+        });
+        substituteList.replaceChildren(...cards);
+    }
+
+    async function respondToSubstituteRequest(request, response, button) {
+        button.disabled = true;
+        substituteStatus.textContent =
+            response === "accept" ? "대타 요청을 수락하는 중..." : "대타 요청을 거절하는 중...";
+        try {
+            await mutate(
+                `${groupPath}/substitute-requests/`
+                    + `${encodeURIComponent(request.requestId)}/${response}`,
+                {
+                    method: "POST",
+                    ifMatch: strongEtag(request.version)
+                }
+            );
+            await Promise.all([
+                loadSubstituteRequests(),
+                loadOccurrences()
+            ]);
+        } catch (error) {
+            substituteStatus.textContent = errorMessage(error);
+            button.disabled = false;
+        }
+    }
+
+    async function openCompletedHistory() {
+        completedHistoryStatus.textContent = "";
+        completedHistoryDialog.showModal();
+        await loadCompletedHistory();
+    }
+
+    async function loadCompletedHistory() {
+        completedHistoryStatus.textContent = "완료 이력을 불러오는 중...";
+        completedHistoryList.replaceChildren();
+        try {
+            const response = await requestJson(
+                `${groupPath}/occurrences/completed-history?mineOnly=false`
+            );
+            const items = Array.isArray(response.items) ? response.items : [];
+            renderCompletedHistory(items);
+            completedHistoryStatus.textContent = items.length
+                ? `완료 ${response.totalCount}건`
+                : "완료된 업무가 없습니다.";
+        } catch (error) {
+            completedHistoryStatus.textContent = errorMessage(error);
+        }
+    }
+
+    function renderCompletedHistory(items) {
+        const cards = items.map((item) => {
+            const card = document.createElement("article");
+            card.className = "workflow-card";
+            const heading = document.createElement("div");
+            heading.className = "occurrence-heading";
+            const title = document.createElement("div");
+            const name = document.createElement("h3");
+            name.textContent = item.choreName;
+            const period = document.createElement("p");
+            period.textContent = `${item.periodStart} — ${item.periodEndExclusive}`;
+            title.append(name, period);
+            const badge = document.createElement("span");
+            badge.className = "status-badge";
+            badge.textContent = "완료";
+            heading.append(title, badge);
+
+            const assignee = document.createElement("p");
+            assignee.className = "workflow-meta";
+            assignee.textContent =
+                `완료자 · ${item.lastAssignee?.displayName || "알 수 없음"}`;
+            const completedAt = document.createElement("p");
+            completedAt.className = "workflow-meta";
+            completedAt.textContent =
+                `완료 시각 · ${new Date(item.closedAt).toLocaleString("ko-KR")}`;
+            card.append(heading, assignee, completedAt);
+
+            if ((item.availableActions || []).includes("UNDO_COMPLETE")) {
+                const actions = document.createElement("div");
+                actions.className = "occurrence-actions";
+                const undo = document.createElement("button");
+                undo.type = "button";
+                undo.textContent = "완료 취소";
+                undo.addEventListener(
+                    "click",
+                    () => void undoCompletedOccurrence(item, undo)
+                );
+                actions.append(undo);
+                card.append(actions);
+            }
+            return card;
+        });
+        completedHistoryList.replaceChildren(...cards);
+    }
+
+    async function undoCompletedOccurrence(item, button) {
+        const note = window.prompt("완료 취소 메모를 남길 수 있어요.", "");
+        if (note === null) {
+            return;
+        }
+        button.disabled = true;
+        completedHistoryStatus.textContent = "완료를 취소하는 중...";
+        try {
+            await mutate(
+                `${groupPath}/occurrences/${encodeURIComponent(item.occurrenceId)}`
+                    + "/undo-complete",
+                {
+                    method: "POST",
+                    body: {note: note || null},
+                    ifMatch: strongEtag(item.version)
+                }
+            );
+            await Promise.all([
+                loadCompletedHistory(),
+                loadOccurrences()
+            ]);
+        } catch (error) {
+            completedHistoryStatus.textContent = errorMessage(error);
+            button.disabled = false;
+        }
+    }
+
     async function deactivateChore(chore, button) {
         const confirmed = window.confirm(
             `${chore.name} 업무를 비활성화할까요?\n`
@@ -641,6 +991,11 @@
         biweeklyField.hidden = frequencyInput.value !== "BIWEEKLY";
     }
 
+    function syncEditScheduleFields() {
+        editWeeklyField.hidden = editChoreFrequency.value !== "WEEKLY";
+        editBiweeklyField.hidden = editChoreFrequency.value !== "BIWEEKLY";
+    }
+
     function syncEligibilityField() {
         selectedMembersField.hidden = eligibilityMode.value !== "SELECTED_MEMBERS";
     }
@@ -696,7 +1051,27 @@
             COMPLETE: "업무 완료",
             SKIP_ALREADY_DONE: "이미 처리됨",
             DECLINE: "이번 회차는 어려워요",
-            RETRY_ASSIGNMENT: "자동 배정 다시 시도"
+            REQUEST_SUBSTITUTE: "대타 요청",
+            RETRY_ASSIGNMENT: "자동 배정 다시 시도",
+            UNDO_COMPLETE: "완료 취소"
+        }[value] || value;
+    }
+
+    function substituteRequestStatusLabel(value) {
+        return {
+            PENDING: "응답 대기",
+            ACCEPTED: "수락됨",
+            EXHAUSTED: "전원 거절",
+            CANCELLED: "취소됨"
+        }[value] || value;
+    }
+
+    function substituteRecipientStatusLabel(value) {
+        return {
+            PENDING: "대기",
+            ACCEPTED: "수락",
+            DECLINED: "거절",
+            INELIGIBLE: "응답 종료"
         }[value] || value;
     }
 

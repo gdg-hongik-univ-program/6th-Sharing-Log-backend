@@ -8,18 +8,19 @@
 
 ## 1. 목적과 범위
 
-이 문서는 매일·매주·격주 업무 정의, 가능 멤버, 회차 조회, 완료·생략·수행 불가, `NEEDS_ATTENTION` 복구, 멤버 탈퇴 재배정을 위한 REST API 계약을 정의한다.
+이 문서는 매일·매주·격주 업무 정의, 가능 멤버, 회차 조회, 완료·생략·수행 불가, 대타 요청, 완료 취소, `NEEDS_ATTENTION` 복구, 멤버 탈퇴 재배정을 위한 REST API 계약을 정의한다.
 
-정책과 API가 충돌하면 `rotation-policy.md`가 우선한다. 특히 MVP에서는 자원자 모집이나 투표 방식의 대타를 제공하지 않는다. 와이어프레임의 기존 동작은 다음과 같이 연결한다.
+정책과 API가 충돌하면 `rotation-policy.md`가 우선한다. 자동 배정은 선택 순서가 아니라 공정성 점수로 후보를 좁힌 뒤 최종 동점자 사이에서 무작위 선택한다. 와이어프레임의 동작은 다음과 같이 연결한다.
 
 | 와이어프레임 동작 | API 동작 |
 |---|---|
 | 매일·매주·격주 탭 | `GET /occurrences`의 `frequency` 필터 |
 | 내 업무의 `업무 완료` | `POST /occurrences/{occurrenceId}/complete` |
-| 기존 `대타 요청` | `이번 회차는 어려워요`로 문구를 바꾸고 `POST /decline` 호출 |
+| `대타 요청` | `POST /occurrences/{occurrenceId}/substitute-requests` |
+| `이번 회차는 어려워요` | `POST /occurrences/{occurrenceId}/decline`으로 즉시 공정 재배정 |
 | 새 `이미 처리되어서 생략했어요` | `POST /skip-already-done` |
-| 완료 업무 목록 | `GET /occurrences?status=COMPLETED&status=SKIPPED` |
-| 기존 `완료 취소` | MVP에서 제거한다. 종료 회차를 다시 여는 API는 제공하지 않는다. |
+| 전체 완료 업무 목록 | `GET /occurrences/completed-history` |
+| `완료 취소` | `POST /occurrences/{occurrenceId}/undo-complete` |
 | 관리자 관리 필요 목록 | `GET /occurrences?status=NEEDS_ATTENTION` 및 `POST /retry-assignment` |
 
 ## 2. 공통 계약
@@ -38,11 +39,15 @@
 | 업무·회차 조회 | 활성 그룹 멤버 |
 | 업무 생성·수정·비활성화, 가능 멤버 변경 | `OWNER` |
 | 완료·이미 처리됨·이번 회차 불가 | 해당 회차의 현재 담당자 |
+| 대타 요청 생성 | 해당 회차의 현재 담당자 |
+| 대타 수락·거절 | 요청 생성 당시의 활성 수신 멤버 |
+| 대타 요청 조회 | 요청자, 수신자, `OWNER` |
+| 완료 취소 | 해당 회차의 마지막 유효 완료자인 활성 멤버 |
 | `NEEDS_ATTENTION` 재시도 | `OWNER` |
 | 본인 탈퇴 | 해당 활성 멤버 |
 | 다른 멤버 내보내기 | `OWNER` |
 
-`OWNER`라도 다른 담당자를 대신해 완료·생략·수행 불가를 기록할 수 없다.
+`OWNER`라도 다른 담당자를 대신해 완료·생략·수행 불가·대타 응답·완료 취소를 기록할 수 없다.
 
 ### 2.2 외부 식별자
 
@@ -52,6 +57,7 @@
 - `membershipId`
 - `choreId`
 - `occurrenceId`
+- `requestId`
 
 데이터베이스의 숫자 PK, 사용자 PK, 배정 시도 PK는 URI, 요청·응답 본문, `Location` 헤더, 오류 본문에 절대 노출하지 않는다. 배정 이력의 `sequence`는 회차 안의 표시 순번이며 리소스 ID가 아니다.
 
@@ -90,6 +96,10 @@ If-Match: "7"
 - 올바른 버전이지만 허용되지 않는 상태 전이: `409 INVALID_OCCURRENCE_STATE`
 
 같은 회차에 완료와 수행 불가가 동시에 도착하면 먼저 커밋된 요청만 성공한다. 나머지 요청은 `409 VERSION_CONFLICT`를 받으며 서버가 자동으로 다른 상태 전이를 시도하지 않는다.
+
+- 대타 요청 생성은 회차의 `version`을 사용한다.
+- 대타 수락·거절은 대타 요청의 `version`을 사용한다.
+- 대타 요청 생성은 `201 + Location + ETag`, 수락·거절은 `200 + ETag`를 반환한다.
 
 ### 2.5 멱등 키
 
@@ -248,7 +258,7 @@ API는 사용자 계정 ID나 이메일 대신 그룹 멤버십의 공개 UUID�
 - `NEEDS_ATTENTION`: `currentAssignee`가 없고 `attention`이 반드시 있다.
 - `COMPLETED`, `SKIPPED`: `currentAssignee`가 없고 `lastAssignee`와 `closedAt`이 있다.
 - 재배정 실패로 `NEEDS_ATTENTION`이 된 경우 `lastAssignee`에는 직전에 종료된 담당자가 있을 수 있다. 이는 현재 담당자가 아니다.
-- `availableActions`는 로그인한 요청자 기준이다. 현재 담당자에게는 `COMPLETE`, `SKIP_ALREADY_DONE`, `DECLINE`, 관리자에게는 필요한 경우 `RETRY_ASSIGNMENT`가 포함된다.
+- `availableActions`는 로그인한 요청자 기준이다. 현재 담당자에게는 `COMPLETE`, `SKIP_ALREADY_DONE`, `DECLINE`과 진행 중 요청이 없을 때 `REQUEST_SUBSTITUTE`가 포함된다. 마지막 유효 완료자에게는 `UNDO_COMPLETE`, 관리자에게는 필요한 경우 `RETRY_ASSIGNMENT`가 포함된다.
 
 관리 필요 정보의 형식은 다음과 같다.
 
@@ -262,7 +272,7 @@ API는 사용자 계정 ID나 이메일 대신 그룹 멤버십의 공개 UUID�
 
 후보가 없다는 사실은 정상적인 도메인 결과다. 조회나 재시도 응답을 `4xx`로 바꾸지 않는다.
 
-### 3.4 회차 상세와 이력
+### 3.4 회차 상세와 이력 (후속 설계, 현재 미구현)
 
 단건 회차 응답은 요약 필드에 가능 멤버 스냅샷, 배정 이력, 결정 감사 정보를 추가한다.
 
@@ -395,12 +405,12 @@ API는 사용자 계정 ID나 이메일 대신 그룹 멤버십의 공개 UUID�
 | 필드 | 값 |
 |---|---|
 | 회차 상태 | `ASSIGNED`, `COMPLETED`, `SKIPPED`, `NEEDS_ATTENTION` |
-| 배정 계기 | `INITIAL`, `DECLINE_REASSIGNMENT`, `MEMBER_LEFT_REASSIGNMENT`, `NEEDS_ATTENTION_RETRY` |
-| 배정 종료 사유 | `COMPLETED`, `SKIPPED_ALREADY_DONE`, `DECLINED_BY_ASSIGNEE`, `ASSIGNEE_LEFT_GROUP` |
+| 배정 계기 | `INITIAL`, `DECLINE_REASSIGNMENT`, `MEMBER_LEFT_REASSIGNMENT`, `NEEDS_ATTENTION_RETRY`, `PARTICIPATION_CHANGE_REASSIGNMENT`, `PARTICIPATION_CHANGE_RETRY`, `SUBSTITUTE_ACCEPTANCE`, `COMPLETION_REOPENED` |
+| 배정 종료 사유 | `COMPLETED`, `SKIPPED_ALREADY_DONE`, `DECLINED_BY_ASSIGNEE`, `ASSIGNEE_LEFT_GROUP`, `PARTICIPATION_REMOVED`, `SUBSTITUTE_ACCEPTED` |
 | 결정 결과 | `ASSIGNED`, `NO_CANDIDATE` |
 | 후보 제외 사유 | `INACTIVE`, `NOT_ELIGIBLE`, `DECLINED_CURRENT_OCCURRENCE` |
 
-`decisionSeed`는 JavaScript의 안전 정수 범위를 넘을 수 있으므로 문자열로 응답한다. 배정 시도와 결정 이력은 수정하거나 삭제하지 않는다.
+`decisionSeed`는 JavaScript의 안전 정수 범위를 넘을 수 있으므로 문자열로 응답한다. 자동 배정은 `fair-random-v2`, 대타 수락과 완료 취소 복원은 `manual-action-v1` 및 seed `0`으로 기록한다. 배정 핵심 이력은 삭제하거나 덮어쓰지 않으며 완료 취소 메타데이터만 추가한다.
 
 ## 4. 엔드포인트 요약
 
@@ -408,15 +418,19 @@ API는 사용자 계정 ID나 이메일 대신 그룹 멤버십의 공개 UUID�
 |---|---|---|---|
 | `POST` | `/api/groups/{groupId}/chores` | 업무 생성 및 현재 회차 최초 배정 | `201` |
 | `GET` | `/api/groups/{groupId}/chores` | 업무 목록 | `200` |
-| `GET` | `/api/groups/{groupId}/chores/{choreId}` | 업무 단건 | `200` |
-| `PATCH` | `/api/groups/{groupId}/chores/{choreId}` | 업무 기본 정보·주기 수정/재활성화 | `200` |
-| `PUT` | `/api/groups/{groupId}/chores/{choreId}/eligible-members` | 가능 멤버 전체 교체 | `200` |
+| `PATCH` | `/api/groups/{groupId}/chores/{choreId}` | 업무명·주기·마감일 수정 | `200` |
 | `DELETE` | `/api/groups/{groupId}/chores/{choreId}` | 업무 비활성화 | `204` |
 | `GET` | `/api/groups/{groupId}/occurrences` | 주기·기간·상태별 회차 목록 | `200` |
-| `GET` | `/api/groups/{groupId}/occurrences/{occurrenceId}` | 회차와 전체 이력 조회 | `200` |
+| `GET` | `/api/groups/{groupId}/occurrences/completed-history` | 전체 또는 내 완료 업무 이력 | `200` |
 | `POST` | `/api/groups/{groupId}/occurrences/{occurrenceId}/complete` | 실제 완료 | `200` |
 | `POST` | `/api/groups/{groupId}/occurrences/{occurrenceId}/skip-already-done` | 이미 처리됨으로 생략 | `200` |
 | `POST` | `/api/groups/{groupId}/occurrences/{occurrenceId}/decline` | 이번 회차 수행 불가 및 자동 재배정 | `200` |
+| `POST` | `/api/groups/{groupId}/occurrences/{occurrenceId}/undo-complete` | 완료 취소 및 같은 멤버로 복원 | `200` |
+| `POST` | `/api/groups/{groupId}/occurrences/{occurrenceId}/substitute-requests` | 대타 요청 생성 | `201` |
+| `GET` | `/api/groups/{groupId}/substitute-requests` | 받은·보낸·전체 대타 요청 조회 | `200` |
+| `GET` | `/api/groups/{groupId}/substitute-requests/{requestId}` | 대타 요청 단건 조회 | `200` |
+| `POST` | `/api/groups/{groupId}/substitute-requests/{requestId}/accept` | 대타 수락 | `200` |
+| `POST` | `/api/groups/{groupId}/substitute-requests/{requestId}/reject` | 대타 거절 | `200` |
 | `POST` | `/api/groups/{groupId}/occurrences/{occurrenceId}/retry-assignment` | 관리 필요 회차 재시도 | `200` |
 | `GET` | `/api/groups/{groupId}/rotation-members` | 활성 멤버와 관리 권한 조회 | `200` |
 | `PATCH` | `/api/groups/{groupId}/rotation-members/{membershipId}/chore-participations` | 여러 업무 참여 일괄 추가·제외 | `200` |
@@ -518,10 +532,10 @@ ETag: "1"
 - 알 수 없거나 다른 그룹의 멤버: `404 RESOURCE_NOT_FOUND`
 - 격주 `biweeklyAnchorDate`: 그룹의 `weekStartsOn`과 같은 요일
 
-### 5.2 업무 목록과 단건 조회
+### 5.2 업무 목록
 
 ```http
-GET /api/groups/{groupId}/chores?frequency=WEEKLY&active=true&size=30&cursor={cursor}
+GET /api/groups/{groupId}/chores?frequency=WEEKLY&active=true
 ```
 
 쿼리:
@@ -530,8 +544,6 @@ GET /api/groups/{groupId}/chores?frequency=WEEKLY&active=true&size=30&cursor={cu
 |---|---|---|
 | `frequency` | 전체 | `DAILY`, `WEEKLY`, `BIWEEKLY` |
 | `active` | `true` | `true`, `false`, `all` |
-| `size` | `30` | 1~100 |
-| `cursor` | 없음 | 서버가 발급한 불투명 커서 |
 
 ```json
 {
@@ -561,15 +573,7 @@ GET /api/groups/{groupId}/chores?frequency=WEEKLY&active=true&size=30&cursor={cu
 }
 ```
 
-목록에서는 페이로드 크기를 줄이기 위해 `eligibility.members`를 생략해 빈 배열로 보낼 수 있다. 정확한 가능 멤버는 단건 조회로 확인한다.
-
-단건 조회:
-
-```http
-GET /api/groups/{groupId}/chores/{choreId}
-```
-
-성공 시 `200`, 본문은 3.2의 전체 업무 표현이며 `ETag`를 함께 반환한다.
+현재 목록 응답에는 각 업무의 가능 멤버가 포함된다. 페이징은 적용하지 않으며 `nextCursor=null`, `hasNext=false`다.
 
 ### 5.3 업무 수정
 
@@ -592,48 +596,15 @@ If-Match: "3"
 }
 ```
 
-- `name`, `schedule`, `active` 중 하나 이상을 보낸다.
+- `name`, `schedule` 중 하나 이상을 보낸다.
 - `schedule`을 보내면 주기별 스케줄 객체 전체를 보낸다.
-- 가능 멤버는 이 API가 아니라 `/eligible-members`로 변경한다.
-- 변경은 다음에 생성되는 회차부터 적용한다. 현재 및 과거 회차의 주기·기간·가능 멤버 스냅샷은 바뀌지 않는다.
+- 가능 멤버는 멤버별 참여 업무 일괄 변경 API로 변경한다.
+- 변경은 다음에 생성되는 회차부터 적용한다. 현재 및 과거 회차의 업무명·주기·기간·가능 멤버 스냅샷은 바뀌지 않는다.
+- 새 일정의 현재 기간이 기존 최신 회차와 겹치면 중복 회차를 만들지 않고, 겹치지 않는 다음 경계부터 새 일정으로 생성한다.
 
 성공 시 `200`, 갱신된 전체 업무와 새 `ETag`를 반환한다.
 
-### 5.4 가능 멤버 전체 교체
-
-전체 활성 멤버를 후보로 전환:
-
-```http
-PUT /api/groups/{groupId}/chores/{choreId}/eligible-members
-Content-Type: application/json
-Idempotency-Key: cccccccc-cccc-4ccc-8ccc-cccccccccccc
-If-Match: "4"
-```
-
-```json
-{
-  "mode": "ALL_ACTIVE_MEMBERS",
-  "membershipIds": []
-}
-```
-
-특정 멤버만 허용:
-
-```json
-{
-  "mode": "SELECTED_MEMBERS",
-  "membershipIds": [
-    "44444444-4444-4444-8444-444444444444",
-    "55555555-5555-4555-8555-555555555555"
-  ]
-}
-```
-
-성공 시 `200`, 갱신된 전체 업무와 새 `ETag`를 반환한다.
-
-이 변경은 기존 회차에 자동 적용하지 않는다. `NEEDS_ATTENTION` 회차에 현재 설정을 적용하려면 해당 회차의 재시도 요청에서 `eligibilitySource=CURRENT_CHORE`를 명시한다.
-
-### 5.5 업무 비활성화
+### 5.4 업무 비활성화
 
 ```http
 DELETE /api/groups/{groupId}/chores/{choreId}
@@ -646,7 +617,6 @@ If-Match: "5"
 - 새 회차 생성을 중단한다.
 - 이미 생성된 `ASSIGNED`, `NEEDS_ATTENTION`, 종료 회차는 삭제하거나 상태를 바꾸지 않는다.
 - 과거 배정·완료·생략 이력을 보존한다.
-- 재활성화는 `PATCH`에서 `{"active": true}`로 수행한다.
 
 ## 6. 회차 조회 API
 
@@ -701,7 +671,7 @@ GET /api/groups/{groupId}/occurrences?frequency=BIWEEKLY&activeOn=2026-07-23
 }
 ```
 
-### 6.2 미래·과거 범위 조회
+### 6.2 미래·과거 범위 조회 (후속 설계, 현재 미구현)
 
 와이어프레임의 이번 주, 1주 후, 2주 후 아코디언은 기간 시작일 범위 조회를 사용한다.
 
@@ -726,9 +696,9 @@ GET /api/groups/{groupId}/occurrences?frequency=WEEKLY&periodStartFrom=2026-07-1
 | `size` | 기본 50, 최대 100 |
 | `cursor` | 서버 발급 불투명 커서 |
 
-홈의 “내 업무”는 필요한 일간·주간·격주 범위를 병렬 조회하면서 `mineOnly=true&status=ASSIGNED`를 사용한다. 완료 업무 화면은 `status=COMPLETED&status=SKIPPED`를 사용한다.
+홈의 “내 업무”는 필요한 일간·주간·격주 범위를 병렬 조회하면서 `mineOnly=true&status=ASSIGNED`를 사용한다. 완료 업무 화면은 전용 `GET /occurrences/completed-history`를 사용한다.
 
-### 6.3 회차 단건과 이력
+### 6.3 회차 단건과 이력 (후속 설계, 현재 미구현)
 
 ```http
 GET /api/groups/{groupId}/occurrences/{occurrenceId}
@@ -917,6 +887,73 @@ If-Match: "4"
 | 회차가 `ASSIGNED`가 아님 | `409 INVALID_OCCURRENCE_STATE` |
 | 읽은 뒤 다른 요청이 상태 변경 | `409 VERSION_CONFLICT` |
 | 종료 회차를 다시 완료·생략·거절 | `409 INVALID_OCCURRENCE_STATE` |
+
+### 7.5 전체 완료 이력과 완료 취소
+
+```http
+GET /api/groups/{groupId}/occurrences/completed-history?mineOnly=false&choreId={choreId}
+```
+
+- `COMPLETED` 회차만 `closedAt` 내림차순으로 반환하며 `SKIPPED`는 제외한다.
+- `mineOnly=true`이면 로그인 멤버가 유효하게 완료한 회차만 반환한다.
+- 완료 취소된 회차는 `ASSIGNED`로 복원되므로 목록과 완료 집계에서 제외한다.
+- 응답은 `groupId`, `mineOnly`, `items`, `totalCount`를 가지며 현재 페이징은 없다.
+
+완료 취소:
+
+```http
+POST /api/groups/{groupId}/occurrences/{occurrenceId}/undo-complete
+Content-Type: application/json
+Idempotency-Key: 99999999-9999-4999-8999-999999999999
+If-Match: "{occurrenceVersion}"
+
+{"note": "완료 버튼을 잘못 눌렀어요."}
+```
+
+마지막 유효 완료자인 활성 멤버만 호출할 수 있다. 기존 완료 배정은 삭제하지 않고 취소 시각·취소자·선택 메모를 남긴다. 회차는 `ASSIGNED`로 바뀌며 같은 멤버에게 `COMPLETION_REOPENED` 배정을 추가한다. 성공 응답의 `outcome`은 `COMPLETION_UNDONE`이다. `SKIPPED`는 취소할 수 없다.
+
+### 7.6 대타 요청
+
+생성:
+
+```http
+POST /api/groups/{groupId}/occurrences/{occurrenceId}/substitute-requests
+Content-Type: application/json
+Idempotency-Key: aaaaaaaa-0000-4000-8000-aaaaaaaaaaaa
+If-Match: "{occurrenceVersion}"
+
+{"reason": "마감 시간에 외부 일정이 있어요."}
+```
+
+- 사유는 공백 제거 후 1~500자이며 현재 담당자만 생성할 수 있다.
+- 회차 가능 멤버 스냅샷 중 현재 활성 세대의 활성 멤버에게 요청한다. 요청자와 같은 회차의 수행 불가·대타 이전 제외 멤버는 뺀다.
+- 요청 중에도 원 담당자와 회차의 `ASSIGNED` 상태는 유지된다.
+- 같은 활성 배정에는 진행 중 요청 하나만 허용한다.
+- 수신자가 없으면 `409 NO_SUBSTITUTE_CANDIDATE`다.
+- 성공은 `201`, 요청 URI를 담은 `Location`, 요청 버전 `ETag`를 반환한다.
+
+조회:
+
+```http
+GET /api/groups/{groupId}/substitute-requests?box=INBOX&status=PENDING
+GET /api/groups/{groupId}/substitute-requests/{requestId}
+```
+
+`box`는 `INBOX`, `OUTBOX`, `ALL`이며 기본은 `INBOX`다. 요청 상태는 `PENDING`, `ACCEPTED`, `EXHAUSTED`, `CANCELLED`, 수신자 상태는 `PENDING`, `ACCEPTED`, `DECLINED`, `INELIGIBLE`이다. 일반 멤버는 자신이 요청자 또는 수신자인 항목만, `OWNER`는 `ALL`에서 그룹 전체를 볼 수 있다.
+
+수락·거절:
+
+```http
+POST /api/groups/{groupId}/substitute-requests/{requestId}/accept
+POST /api/groups/{groupId}/substitute-requests/{requestId}/reject
+Idempotency-Key: bbbbbbbb-0000-4000-8000-bbbbbbbbbbbb
+If-Match: "{requestVersion}"
+```
+
+- 첫 유효 수락자가 담당자가 된다. 원 배정은 `SUBSTITUTE_ACCEPTED`, 새 직접 배정은 `SUBSTITUTE_ACCEPTANCE`로 기록하고 다른 수신자는 `INELIGIBLE`이 된다.
+- 거절은 해당 수신자만 `DECLINED`로 바꾼다. 응답 가능한 수신자가 없으면 요청은 `EXHAUSTED`가 되지만 원 담당자는 유지된다.
+- 완료·생략·수행 불가·현재 담당자의 탈퇴 또는 참여 제외 시 진행 중 요청은 `CANCELLED`가 된다. 일반 수신자의 탈퇴·참여 제외는 해당 수신자만 `INELIGIBLE`로 바꾼다.
+- 대타 수락은 공정 랜덤 재실행이 아니라 사용자의 명시적 수락에 따른 직접 배정이다.
 
 ## 8. `NEEDS_ATTENTION` 재시도
 
@@ -1110,11 +1147,14 @@ ETag: "3"
 | `204` | - | 업무 비활성화 성공 |
 | `400` | `VALIDATION_FAILED`, `INVALID_QUERY` | 본문, enum, 날짜 범위, UUID 형식 오류 |
 | `401` | `UNAUTHENTICATED` | 로그인 필요 |
-| `403` | `FORBIDDEN`, `NOT_CURRENT_ASSIGNEE` | 역할 또는 담당자 권한 부족 |
+| `403` | `FORBIDDEN`, `NOT_CURRENT_ASSIGNEE`, `NOT_SUBSTITUTE_RECIPIENT` | 역할·담당자·대타 수신자 권한 부족 |
 | `404` | `RESOURCE_NOT_FOUND` | 그룹에 속한 리소스를 찾을 수 없음 |
 | `409` | `VERSION_CONFLICT` | `If-Match` 버전이 현재 버전과 다름 |
 | `409` | `CHORE_VERSION_CONFLICT` | 재시도에 지정한 현재 업무 버전이 다름 |
 | `409` | `INVALID_OCCURRENCE_STATE` | 현재 상태에서 허용되지 않는 행동 |
+| `409` | `INVALID_SUBSTITUTE_REQUEST_STATE` | 현재 요청·회차 상태에서 대타 응답 불가 |
+| `409` | `SUBSTITUTE_REQUEST_ALREADY_EXISTS` | 같은 활성 배정에 대타 요청이 이미 존재 |
+| `409` | `NO_SUBSTITUTE_CANDIDATE` | 대타 요청을 받을 활성 가능 멤버가 없음 |
 | `409` | `IDEMPOTENCY_KEY_REUSED` | 같은 키를 다른 요청에 재사용 |
 | `409` | `MEMBER_ALREADY_LEFT` | 이미 탈퇴한 멤버에 대한 새 탈퇴 명령 |
 | `409` | `LAST_OWNER_CANNOT_LEAVE` | 그룹 소유권 정책 위반 |
@@ -1138,5 +1178,6 @@ API 구현은 어느 진입점에서도 다음 조건을 깨뜨리면 안 된다
 10. 후보가 없을 때 가능 멤버 제한이나 수행 불가 기록을 자동으로 완화하지 않는다.
 11. 동일 멱등 요청은 상태 전이와 점수를 한 번만 반영한다.
 12. 낙관적 잠금과 데이터베이스 유일 제약으로 현재 담당자 중복과 중복 회차를 함께 막는다.
-13. 종료 회차를 재개하거나 결과를 취소하는 URI를 제공하지 않는다.
-14. 모든 응답과 오류는 공개 UUID만 사용한다.
+13. `COMPLETED`는 마지막 유효 완료자만 재개할 수 있고, 취소된 완료는 완료·기간 업무량 집계에서 제외한다.
+14. 회차당 진행 중 대타 요청은 최대 하나이고, 요청당 수락자는 최대 한 명이다.
+15. 모든 응답과 오류는 공개 UUID만 사용한다.

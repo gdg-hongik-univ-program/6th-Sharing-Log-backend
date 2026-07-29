@@ -8,6 +8,7 @@ import gdg.sharinglog.domain.User;
 import gdg.sharinglog.domain.rotation.ChoreOccurrence;
 import gdg.sharinglog.domain.rotation.OccurrenceStatus;
 import gdg.sharinglog.repository.rotation.ChoreAssignmentAttemptRepository;
+import gdg.sharinglog.repository.rotation.SubstituteRequestRepository;
 import gdg.sharinglog.service.rotation.access.RotationActor;
 import gdg.sharinglog.service.rotation.api.chore.ChoreView;
 import gdg.sharinglog.web.rotation.dto.AttentionResponse;
@@ -21,9 +22,14 @@ import org.springframework.stereotype.Component;
 public class RotationViewMapper {
 
     private final ChoreAssignmentAttemptRepository assignmentRepository;
+    private final SubstituteRequestRepository substituteRequestRepository;
 
-    public RotationViewMapper(ChoreAssignmentAttemptRepository assignmentRepository) {
+    public RotationViewMapper(
+            ChoreAssignmentAttemptRepository assignmentRepository,
+            SubstituteRequestRepository substituteRequestRepository
+    ) {
         this.assignmentRepository = assignmentRepository;
+        this.substituteRequestRepository = substituteRequestRepository;
     }
 
     public ChoreResponse chore(ChoreView view) {
@@ -56,7 +62,7 @@ public class RotationViewMapper {
         return new OccurrenceSummaryResponse(
                 occurrence.getPublicId(),
                 occurrence.getChore().getPublicId(),
-                occurrence.getChore().getName(),
+                occurrence.getChoreNameSnapshot(),
                 occurrence.getFrequencySnapshot(),
                 occurrence.getPeriodStart(),
                 occurrence.getPeriodEndExclusive(),
@@ -128,9 +134,23 @@ public class RotationViewMapper {
             actions.add(OccurrenceSummaryResponse.AvailableAction.COMPLETE);
             actions.add(OccurrenceSummaryResponse.AvailableAction.SKIP_ALREADY_DONE);
             actions.add(OccurrenceSummaryResponse.AvailableAction.DECLINE);
+            if (substituteRequestRepository
+                    .findByOccurrence_IdAndActiveMarker(occurrence.getId(), 1)
+                    .isEmpty()) {
+                actions.add(OccurrenceSummaryResponse.AvailableAction.REQUEST_SUBSTITUTE);
+            }
         }
         if (occurrence.getStatus() == OccurrenceStatus.NEEDS_ATTENTION && actor.isOwner()) {
             actions.add(OccurrenceSummaryResponse.AvailableAction.RETRY_ASSIGNMENT);
+        }
+        if (occurrence.getStatus() == OccurrenceStatus.COMPLETED
+                && assignmentRepository
+                .findFirstByOccurrence_IdOrderBySequenceNumberDesc(occurrence.getId())
+                .filter(assignment -> assignment.isEffectiveCompletion()
+                        && assignment.getAssignee().getId()
+                        .equals(actor.membership().getId()))
+                .isPresent()) {
+            actions.add(OccurrenceSummaryResponse.AvailableAction.UNDO_COMPLETE);
         }
         return List.copyOf(actions);
     }

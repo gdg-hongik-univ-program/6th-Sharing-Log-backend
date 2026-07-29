@@ -317,7 +317,8 @@ button:disabled {
 }
 
 .rotation-dialog input:not([type="checkbox"]):not([type="radio"]),
-.rotation-dialog select {
+.rotation-dialog select,
+.rotation-dialog textarea {
     width: 100%;
     padding: 9px;
     border: 1px solid #dadce0;
@@ -389,6 +390,33 @@ button:disabled {
     margin-top: 12px;
 }
 
+.workflow-list {
+    display: grid;
+    gap: 10px;
+}
+
+.workflow-card {
+    padding: 14px;
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+}
+
+.workflow-card h3 {
+    margin: 0;
+}
+
+.workflow-card .occurrence-heading p,
+.workflow-meta {
+    margin: 5px 0 0;
+    color: #5f6368;
+    font-size: 12px;
+}
+
+.workflow-reason {
+    margin: 10px 0;
+    white-space: pre-wrap;
+}
+
 .chore-management-row {
     display: flex;
     align-items: center;
@@ -397,6 +425,12 @@ button:disabled {
     padding: 12px;
     border: 1px solid #dadce0;
     border-radius: 4px;
+}
+
+.management-row-actions {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 8px;
 }
 
 .chore-management-meta {
@@ -432,5 +466,9 @@ button:disabled {
     .chore-management-row {
         align-items: stretch;
         flex-direction: column;
+    }
+
+    .management-row-actions button {
+        flex: 1 1 auto;
     }
 }

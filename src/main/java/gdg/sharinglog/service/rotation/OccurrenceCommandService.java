@@ -17,11 +17,18 @@ import gdg.sharinglog.repository.SharingGroupRepository;
 import gdg.sharinglog.repository.rotation.ChoreAssignmentAttemptRepository;
 import gdg.sharinglog.repository.rotation.ChoreOccurrenceRepository;
 import gdg.sharinglog.repository.rotation.OccurrenceEligibleMemberRepository;
+import gdg.sharinglog.service.rotation.api.substitute.SubstituteRequestLifecycleService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class OccurrenceCommandService {
+
+    private static final List<AssignmentEndReason> SAME_OCCURRENCE_EXCLUSIONS =
+            List.of(
+                    AssignmentEndReason.DECLINED_BY_ASSIGNEE,
+                    AssignmentEndReason.SUBSTITUTE_ACCEPTED
+            );
 
     private final SharingGroupRepository sharingGroupRepository;
     private final GroupMemberRepository groupMemberRepository;
@@ -29,6 +36,8 @@ public class OccurrenceCommandService {
     private final ChoreAssignmentAttemptRepository assignmentRepository;
     private final OccurrenceEligibleMemberRepository eligibilityRepository;
     private final RotationAssignmentService assignmentService;
+    private final DirectAssignmentService directAssignmentService;
+    private final SubstituteRequestLifecycleService substituteRequestLifecycleService;
 
     public OccurrenceCommandService(
             SharingGroupRepository sharingGroupRepository,
@@ -36,7 +45,9 @@ public class OccurrenceCommandService {
             ChoreOccurrenceRepository occurrenceRepository,
             ChoreAssignmentAttemptRepository assignmentRepository,
             OccurrenceEligibleMemberRepository eligibilityRepository,
-            RotationAssignmentService assignmentService
+            RotationAssignmentService assignmentService,
+            DirectAssignmentService directAssignmentService,
+            SubstituteRequestLifecycleService substituteRequestLifecycleService
     ) {
         this.sharingGroupRepository = sharingGroupRepository;
         this.groupMemberRepository = groupMemberRepository;
@@ -44,6 +55,8 @@ public class OccurrenceCommandService {
         this.assignmentRepository = assignmentRepository;
         this.eligibilityRepository = eligibilityRepository;
         this.assignmentService = assignmentService;
+        this.directAssignmentService = directAssignmentService;
+        this.substituteRequestLifecycleService = substituteRequestLifecycleService;
     }
 
     @Transactional
@@ -69,6 +82,10 @@ public class OccurrenceCommandService {
             return occurrence;
         }
         requireCurrentAssignee(occurrence, actor);
+        substituteRequestLifecycleService.cancelPendingForOccurrence(
+                occurrence,
+                completedAt
+        );
         occurrence.complete(
                 Objects.requireNonNull(completedAt, "완료 시각은 필수입니다."),
                 actorNote
@@ -103,11 +120,52 @@ public class OccurrenceCommandService {
             return occurrence;
         }
         requireCurrentAssignee(occurrence, actor);
+        substituteRequestLifecycleService.cancelPendingForOccurrence(
+                occurrence,
+                skippedAt
+        );
         occurrence.skipAlreadyDone(
                 Objects.requireNonNull(skippedAt, "생략 시각은 필수입니다."),
                 actorNote
         );
         return occurrenceRepository.saveAndFlush(occurrence);
+    }
+
+    @Transactional
+    public ChoreOccurrence undoCompletion(
+            String occurrencePublicId,
+            String actorMemberPublicId,
+            Instant undoneAt,
+            String actorNote
+    ) {
+        ChoreOccurrence occurrence = lockedOccurrence(occurrencePublicId);
+        GroupMember actor = requireActorOfOccurrence(actorMemberPublicId, occurrence);
+        if (occurrence.getStatus() != OccurrenceStatus.COMPLETED) {
+            throw new OccurrenceCommandConflictException(
+                    "완료된 회차만 완료 취소할 수 있습니다."
+            );
+        }
+        var completedAssignment = assignmentRepository
+                .findFirstByOccurrence_IdOrderBySequenceNumberDesc(occurrence.getId())
+                .orElseThrow(() -> new IllegalStateException("완료 회차에 배정 이력이 없습니다."));
+        if (!completedAssignment.getAssignee().getId().equals(actor.getId())
+                || !completedAssignment.isEffectiveCompletion()) {
+            throw new OccurrenceCommandConflictException(
+                    "마지막으로 완료 처리한 담당자만 완료 취소할 수 있습니다."
+            );
+        }
+        Instant effectiveUndoneAt =
+                Objects.requireNonNull(undoneAt, "완료 취소 시각은 필수입니다.");
+        completedAssignment.revokeCompletion(actor, effectiveUndoneAt, actorNote);
+        assignmentRepository.saveAndFlush(completedAssignment);
+        directAssignmentService.reopenCompleted(
+                occurrence,
+                actor,
+                effectiveUndoneAt,
+                "COMPLETION_UNDONE_BY_LAST_ASSIGNEE"
+        );
+        occurrenceRepository.flush();
+        return occurrence;
     }
 
     @Transactional
@@ -143,6 +201,10 @@ public class OccurrenceCommandService {
 
         requireCurrentAssignee(occurrence, actor);
         Instant effectiveDeclinedAt = Objects.requireNonNull(declinedAt, "수행 불가 시각은 필수입니다.");
+        substituteRequestLifecycleService.cancelPendingForOccurrence(
+                occurrence,
+                effectiveDeclinedAt
+        );
         occurrence.releaseForReassignment(
                 AssignmentEndReason.DECLINED_BY_ASSIGNEE,
                 effectiveDeclinedAt,
@@ -190,6 +252,10 @@ public class OccurrenceCommandService {
                 );
 
         Instant effectiveLeftAt = Objects.requireNonNull(leftAt, "탈퇴 시각은 필수입니다.");
+        substituteRequestLifecycleService.invalidatePendingForMember(
+                member,
+                effectiveLeftAt
+        );
         member.leave(effectiveLeftAt);
         groupMemberRepository.saveAndFlush(member);
 
@@ -200,6 +266,10 @@ public class OccurrenceCommandService {
                 .toList();
 
         for (ChoreOccurrence occurrence : affected) {
+            substituteRequestLifecycleService.cancelPendingForOccurrence(
+                    occurrence,
+                    effectiveLeftAt
+            );
             occurrence.releaseForReassignment(
                     AssignmentEndReason.ASSIGNEE_LEFT_GROUP,
                     effectiveLeftAt
@@ -287,10 +357,10 @@ public class OccurrenceCommandService {
                 .map(snapshot -> snapshot.getMember())
                 .filter(GroupMember::isActive)
                 .filter(member -> !assignmentRepository
-                        .existsByOccurrence_IdAndAssignee_IdAndEndReason(
+                        .existsByOccurrence_IdAndAssignee_IdAndEndReasonIn(
                                 occurrence.getId(),
                                 member.getId(),
-                                AssignmentEndReason.DECLINED_BY_ASSIGNEE
+                                SAME_OCCURRENCE_EXCLUSIONS
                         ))
                 .count();
     }

@@ -18,7 +18,8 @@ public record OccurrenceActionResponse(
         SKIPPED,
         REASSIGNED,
         NEEDS_ATTENTION,
-        STILL_NEEDS_ATTENTION
+        STILL_NEEDS_ATTENTION,
+        COMPLETION_UNDONE
     }
 
     public record OccurrenceState(

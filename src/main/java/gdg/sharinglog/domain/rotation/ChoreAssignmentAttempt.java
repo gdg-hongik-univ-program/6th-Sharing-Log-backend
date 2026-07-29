@@ -103,6 +103,19 @@ public class ChoreAssignmentAttempt {
     @Column(name = "actor_note", length = 500)
     private String actorNote;
 
+    @Column(name = "completion_revoked_at")
+    private Instant completionRevokedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(
+            name = "completion_revoked_by_membership_id",
+            foreignKey = @ForeignKey(name = "fk_assignment_attempts_completion_revoked_by")
+    )
+    private GroupMember completionRevokedBy;
+
+    @Column(name = "completion_revocation_note", length = 500)
+    private String completionRevocationNote;
+
     private ChoreAssignmentAttempt(
             ChoreOccurrence occurrence,
             GroupMember assignee,
@@ -176,6 +189,36 @@ public class ChoreAssignmentAttempt {
         this.endedAt = effectiveEndedAt;
         this.activeMarker = null;
         this.actorNote = normalizedActorNote;
+    }
+
+    public void revokeCompletion(
+            GroupMember revokedBy,
+            Instant revokedAt,
+            String revocationNote
+    ) {
+        if (endReason != AssignmentEndReason.COMPLETED || endedAt == null || isActive()) {
+            throw new IllegalStateException("완료로 종료된 배정만 완료 취소할 수 있습니다.");
+        }
+        if (completionRevokedAt != null) {
+            throw new IllegalStateException("이미 완료 취소된 배정입니다.");
+        }
+        GroupMember requiredRevokedBy =
+                Objects.requireNonNull(revokedBy, "완료 취소 멤버는 필수입니다.");
+        if (requiredRevokedBy.getGroup() != occurrence.getChore().getGroup()) {
+            throw new IllegalArgumentException("완료 취소 멤버는 회차와 같은 그룹에 속해야 합니다.");
+        }
+        Instant effectiveRevokedAt =
+                Objects.requireNonNull(revokedAt, "완료 취소 시각은 필수입니다.");
+        if (effectiveRevokedAt.isBefore(endedAt)) {
+            throw new IllegalArgumentException("완료 취소 시각은 완료 시각보다 빠를 수 없습니다.");
+        }
+        this.completionRevokedBy = requiredRevokedBy;
+        this.completionRevokedAt = effectiveRevokedAt;
+        this.completionRevocationNote = normalizeOptionalNote(revocationNote);
+    }
+
+    public boolean isEffectiveCompletion() {
+        return endReason == AssignmentEndReason.COMPLETED && completionRevokedAt == null;
     }
 
     private static GroupMember requireEligibleGroupMember(
