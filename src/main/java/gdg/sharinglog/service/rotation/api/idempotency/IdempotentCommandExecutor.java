@@ -17,12 +17,14 @@ import gdg.sharinglog.service.user.AuthenticatedUserService;
 import gdg.sharinglog.web.rotation.error.RotationConflictException;
 import gdg.sharinglog.web.rotation.error.RotationProblemCode;
 import gdg.sharinglog.web.rotation.http.IdempotencyKey;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.json.JsonMapper;
 
 @Service
+@RequiredArgsConstructor
 public class IdempotentCommandExecutor {
 
     private static final Duration RETENTION = Duration.ofHours(24);
@@ -30,16 +32,6 @@ public class IdempotentCommandExecutor {
     private final AuthenticatedUserService authenticatedUserService;
     private final IdempotencyRecordRepository recordRepository;
     private final JsonMapper jsonMapper;
-
-    public IdempotentCommandExecutor(
-            AuthenticatedUserService authenticatedUserService,
-            IdempotencyRecordRepository recordRepository,
-            JsonMapper jsonMapper
-    ) {
-        this.authenticatedUserService = authenticatedUserService;
-        this.recordRepository = recordRepository;
-        this.jsonMapper = jsonMapper;
-    }
 
     @Transactional
     public <T> IdempotentResult<T> execute(

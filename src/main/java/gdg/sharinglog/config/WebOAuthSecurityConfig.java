@@ -4,6 +4,7 @@ import gdg.sharinglog.config.oauth.OAuth2FailureHandler;
 import gdg.sharinglog.config.oauth.OAuth2UserCustomService;
 import gdg.sharinglog.config.oauth.OAuth2SuccessHandler;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -15,19 +16,12 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
+@RequiredArgsConstructor
 public class WebOAuthSecurityConfig {
 
     private final OAuth2UserCustomService oAuth2UserCustomService;
     private final OAuth2SuccessHandler oAuth2SuccessHandler;
     private final OAuth2FailureHandler oAuth2FailureHandler;
-
-    public WebOAuthSecurityConfig(OAuth2UserCustomService oAuth2UserCustomService,
-                                  OAuth2SuccessHandler oAuth2SuccessHandler,
-                                  OAuth2FailureHandler oAuth2FailureHandler) {
-        this.oAuth2UserCustomService = oAuth2UserCustomService;
-        this.oAuth2SuccessHandler = oAuth2SuccessHandler;
-        this.oAuth2FailureHandler = oAuth2FailureHandler;
-    }
 
     @Bean
     public SecurityFilterChain filterChain(

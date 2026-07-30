@@ -22,11 +22,13 @@ import gdg.sharinglog.service.rotation.access.RotationMemberNotFoundException;
 import gdg.sharinglog.web.rotation.error.RotationConflictException;
 import gdg.sharinglog.web.rotation.error.RotationNotFoundException;
 import gdg.sharinglog.web.rotation.error.RotationProblemCode;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class ChoreApplicationService {
 
     private final RotationActorAccessService accessService;
@@ -34,20 +36,6 @@ public class ChoreApplicationService {
     private final ChoreRepository choreRepository;
     private final ChoreEnrollmentService enrollmentService;
     private final OccurrenceGenerationService occurrenceGenerationService;
-
-    public ChoreApplicationService(
-            RotationActorAccessService accessService,
-            GroupMemberRepository groupMemberRepository,
-            ChoreRepository choreRepository,
-            ChoreEnrollmentService enrollmentService,
-            OccurrenceGenerationService occurrenceGenerationService
-    ) {
-        this.accessService = accessService;
-        this.groupMemberRepository = groupMemberRepository;
-        this.choreRepository = choreRepository;
-        this.enrollmentService = enrollmentService;
-        this.occurrenceGenerationService = occurrenceGenerationService;
-    }
 
     @Transactional
     public CreatedChore create(
@@ -105,17 +93,7 @@ public class ChoreApplicationService {
                 .orElseThrow(() -> new RotationNotFoundException(
                         "The requested chore was not found."
                 ));
-        if (chore.getVersion() != expectedVersion) {
-            throw new RotationConflictException(
-                    RotationProblemCode.VERSION_CONFLICT,
-                    "The chore changed. Reload it and try again.",
-                    Map.of(
-                            "resourceId", chore.getPublicId(),
-                            "expectedVersion", expectedVersion,
-                            "currentVersion", chore.getVersion()
-                    )
-            );
-        }
+        requireVersion(chore, expectedVersion);
         if (!chore.getGroup().getId().equals(actor.group().getId())) {
             throw new IllegalStateException("잠긴 업무와 접근 그룹이 일치하지 않습니다.");
         }
@@ -135,6 +113,28 @@ public class ChoreApplicationService {
 
         Chore updated = choreRepository.saveAndFlush(chore);
         return new ChoreView(updated, currentEligibleMembers(updated));
+    }
+
+    @Transactional
+    public long deactivate(
+            String groupPublicId,
+            String chorePublicId,
+            String registrationId,
+            OAuth2User principal,
+            long expectedVersion
+    ) {
+        accessService.requireOwnerForUpdate(groupPublicId, registrationId, principal);
+        Chore chore = choreRepository
+                .findByPublicIdAndGroupPublicIdForUpdate(chorePublicId, groupPublicId)
+                .orElseThrow(() -> new RotationNotFoundException(
+                        "The requested chore was not found."
+                ));
+        requireVersion(chore, expectedVersion);
+        if (chore.isActive()) {
+            chore.deactivate();
+            choreRepository.saveAndFlush(chore);
+        }
+        return chore.getVersion();
     }
 
     private Chore createChore(
@@ -209,5 +209,19 @@ public class ChoreApplicationService {
 
     private List<GroupMember> currentEligibleMembers(Chore chore) {
         return enrollmentService.findActiveMembers(chore);
+    }
+
+    private void requireVersion(Chore chore, long expectedVersion) {
+        if (chore.getVersion() != expectedVersion) {
+            throw new RotationConflictException(
+                    RotationProblemCode.VERSION_CONFLICT,
+                    "The chore changed. Reload it and try again.",
+                    Map.of(
+                            "resourceId", chore.getPublicId(),
+                            "expectedVersion", expectedVersion,
+                            "currentVersion", chore.getVersion()
+                    )
+            );
+        }
     }
 }

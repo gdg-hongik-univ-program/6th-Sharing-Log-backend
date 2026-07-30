@@ -7,11 +7,13 @@ import gdg.sharinglog.repository.GroupMemberRepository;
 import gdg.sharinglog.repository.SharingGroupRepository;
 import gdg.sharinglog.service.group.result.CreatedGroup;
 import gdg.sharinglog.service.user.AuthenticatedUserService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class GroupService {
 
     private static final int MAX_GROUP_NAME_LENGTH = 50;
@@ -19,14 +21,6 @@ public class GroupService {
     private final SharingGroupRepository groupRepository;
     private final GroupMemberRepository groupMemberRepository;
     private final AuthenticatedUserService authenticatedUserService;
-
-    public GroupService(SharingGroupRepository groupRepository,
-                        GroupMemberRepository groupMemberRepository,
-                        AuthenticatedUserService authenticatedUserService) {
-        this.groupRepository = groupRepository;
-        this.groupMemberRepository = groupMemberRepository;
-        this.authenticatedUserService = authenticatedUserService;
-    }
 
     @Transactional
     public CreatedGroup createGroup(String requestedName, String registrationId, OAuth2User oAuth2User) {

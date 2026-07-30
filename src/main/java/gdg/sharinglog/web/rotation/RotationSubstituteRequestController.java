@@ -14,6 +14,7 @@ import gdg.sharinglog.web.rotation.http.ExpectedVersion;
 import gdg.sharinglog.web.rotation.http.IdempotencyKey;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,18 +28,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/groups/{groupId}")
+@RequiredArgsConstructor
 public class RotationSubstituteRequestController {
 
     private final SubstituteRequestApplicationService service;
     private final IdempotentCommandExecutor idempotentExecutor;
-
-    public RotationSubstituteRequestController(
-            SubstituteRequestApplicationService service,
-            IdempotentCommandExecutor idempotentExecutor
-    ) {
-        this.service = service;
-        this.idempotentExecutor = idempotentExecutor;
-    }
 
     @PostMapping("/occurrences/{occurrenceId}/substitute-requests")
     public ResponseEntity<SubstituteRequestResponse> create(

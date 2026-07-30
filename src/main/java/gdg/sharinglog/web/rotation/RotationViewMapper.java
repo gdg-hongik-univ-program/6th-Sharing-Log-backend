@@ -16,21 +16,15 @@ import gdg.sharinglog.web.rotation.dto.ChoreResponse;
 import gdg.sharinglog.web.rotation.dto.MemberRefResponse;
 import gdg.sharinglog.web.rotation.dto.OccurrenceActionResponse;
 import gdg.sharinglog.web.rotation.dto.OccurrenceSummaryResponse;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class RotationViewMapper {
 
     private final ChoreAssignmentAttemptRepository assignmentRepository;
     private final SubstituteRequestRepository substituteRequestRepository;
-
-    public RotationViewMapper(
-            ChoreAssignmentAttemptRepository assignmentRepository,
-            SubstituteRequestRepository substituteRequestRepository
-    ) {
-        this.assignmentRepository = assignmentRepository;
-        this.substituteRequestRepository = substituteRequestRepository;
-    }
 
     public ChoreResponse chore(ChoreView view) {
         var chore = view.chore();

@@ -16,11 +16,13 @@ import gdg.sharinglog.service.group.exception.GroupNotFoundException;
 import gdg.sharinglog.service.invitation.exception.InvitationPermissionDeniedException;
 import gdg.sharinglog.service.invitation.result.IssuedInvitation;
 import gdg.sharinglog.service.user.AuthenticatedUserService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class GroupInvitationService {
 
     private static final Duration INVITATION_VALIDITY = Duration.ofHours(24);
@@ -32,20 +34,6 @@ public class GroupInvitationService {
     private final InvitationCodeGenerator codeGenerator;
     private final InvitationCodeHasher codeHasher;
     private final AuthenticatedUserService authenticatedUserService;
-
-    public GroupInvitationService(SharingGroupRepository groupRepository,
-                                  GroupMemberRepository groupMemberRepository,
-                                  GroupInvitationRepository invitationRepository,
-                                  InvitationCodeGenerator codeGenerator,
-                                  InvitationCodeHasher codeHasher,
-                                  AuthenticatedUserService authenticatedUserService) {
-        this.groupRepository = groupRepository;
-        this.groupMemberRepository = groupMemberRepository;
-        this.invitationRepository = invitationRepository;
-        this.codeGenerator = codeGenerator;
-        this.codeHasher = codeHasher;
-        this.authenticatedUserService = authenticatedUserService;
-    }
 
     @Transactional
     public IssuedInvitation issue(Long groupId, String registrationId, OAuth2User oAuth2User) {

@@ -1,5 +1,7 @@
 package gdg.sharinglog.service.rotation;
 
+import static gdg.sharinglog.domain.rotation.AssignmentEndReason.SAME_OCCURRENCE_EXCLUSIONS;
+
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
@@ -29,19 +31,15 @@ import gdg.sharinglog.rotation.engine.RotationAssignmentResult;
 import gdg.sharinglog.rotation.engine.RotationCandidate;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class RotationAssignmentService {
 
     public static final String ALGORITHM_VERSION = "fair-random-v2";
-    private static final List<AssignmentEndReason> SAME_OCCURRENCE_EXCLUSIONS =
-            List.of(
-                    AssignmentEndReason.DECLINED_BY_ASSIGNEE,
-                    AssignmentEndReason.SUBSTITUTE_ACCEPTED
-            );
-
     private final SharingGroupRepository sharingGroupRepository;
     private final GroupMemberRepository groupMemberRepository;
     private final ChoreOccurrenceRepository occurrenceRepository;
@@ -51,28 +49,6 @@ public class RotationAssignmentService {
     private final RotationDecisionLogRepository decisionLogRepository;
     private final DecisionSeedGenerator seedGenerator;
     private final EntityManager entityManager;
-
-    public RotationAssignmentService(
-            SharingGroupRepository sharingGroupRepository,
-            GroupMemberRepository groupMemberRepository,
-            ChoreOccurrenceRepository occurrenceRepository,
-            ChoreAssignmentAttemptRepository assignmentRepository,
-            ChoreEligibleMemberRepository enrollmentRepository,
-            OccurrenceEligibleMemberRepository eligibilityRepository,
-            RotationDecisionLogRepository decisionLogRepository,
-            DecisionSeedGenerator seedGenerator,
-            EntityManager entityManager
-    ) {
-        this.sharingGroupRepository = sharingGroupRepository;
-        this.groupMemberRepository = groupMemberRepository;
-        this.occurrenceRepository = occurrenceRepository;
-        this.assignmentRepository = assignmentRepository;
-        this.enrollmentRepository = enrollmentRepository;
-        this.eligibilityRepository = eligibilityRepository;
-        this.decisionLogRepository = decisionLogRepository;
-        this.seedGenerator = seedGenerator;
-        this.entityManager = entityManager;
-    }
 
     @Transactional
     public RotationAssignmentResult assign(
@@ -163,7 +139,7 @@ public class RotationAssignmentService {
             occurrence.assign(attempt);
             occurrenceRepository.save(occurrence);
         } else if (result instanceof RotationAssignmentResult.NoCandidate noCandidate) {
-            NoCandidateReason reason = toDomainReason(noCandidate.reason());
+            NoCandidateReason reason = NoCandidateReason.valueOf(noCandidate.reason().name());
             decisionLogRepository.save(RotationDecisionLog.noCandidate(
                     occurrence,
                     decisionSequence,
@@ -182,15 +158,6 @@ public class RotationAssignmentService {
         }
 
         return result;
-    }
-
-    private NoCandidateReason toDomainReason(
-            gdg.sharinglog.rotation.engine.NoCandidateReason reason
-    ) {
-        return switch (reason) {
-            case NO_ACTIVE_ELIGIBLE_NON_DECLINED_CANDIDATE ->
-                    NoCandidateReason.NO_ACTIVE_ELIGIBLE_NON_DECLINED_CANDIDATE;
-        };
     }
 
     private void validateSelectedMember(

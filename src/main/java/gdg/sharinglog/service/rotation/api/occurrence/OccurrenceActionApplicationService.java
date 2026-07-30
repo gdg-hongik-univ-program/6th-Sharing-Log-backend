@@ -29,11 +29,13 @@ import gdg.sharinglog.web.rotation.error.RotationConflictException;
 import gdg.sharinglog.web.rotation.error.RotationForbiddenException;
 import gdg.sharinglog.web.rotation.error.RotationNotFoundException;
 import gdg.sharinglog.web.rotation.error.RotationProblemCode;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class OccurrenceActionApplicationService {
 
     private final RotationActorAccessService accessService;
@@ -46,30 +48,6 @@ public class OccurrenceActionApplicationService {
     private final OccurrenceCommandService commandService;
     private final RotationAssignmentService assignmentService;
     private final RotationViewMapper viewMapper;
-
-    public OccurrenceActionApplicationService(
-            RotationActorAccessService accessService,
-            ChoreOccurrenceRepository occurrenceRepository,
-            ChoreRepository choreRepository,
-            GroupMemberRepository groupMemberRepository,
-            ChoreEligibleMemberRepository choreEligibleMemberRepository,
-            ChoreAssignmentAttemptRepository assignmentRepository,
-            OccurrenceEligibleMemberRepository occurrenceEligibleMemberRepository,
-            OccurrenceCommandService commandService,
-            RotationAssignmentService assignmentService,
-            RotationViewMapper viewMapper
-    ) {
-        this.accessService = accessService;
-        this.occurrenceRepository = occurrenceRepository;
-        this.choreRepository = choreRepository;
-        this.groupMemberRepository = groupMemberRepository;
-        this.choreEligibleMemberRepository = choreEligibleMemberRepository;
-        this.assignmentRepository = assignmentRepository;
-        this.occurrenceEligibleMemberRepository = occurrenceEligibleMemberRepository;
-        this.commandService = commandService;
-        this.assignmentService = assignmentService;
-        this.viewMapper = viewMapper;
-    }
 
     @Transactional
     public OccurrenceActionResponse complete(

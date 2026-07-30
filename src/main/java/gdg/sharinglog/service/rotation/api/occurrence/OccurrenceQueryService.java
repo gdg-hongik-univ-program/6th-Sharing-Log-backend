@@ -15,29 +15,19 @@ import gdg.sharinglog.web.rotation.RotationViewMapper;
 import gdg.sharinglog.web.rotation.dto.OccurrenceListResponse;
 import gdg.sharinglog.web.rotation.dto.CompletedOccurrenceHistoryResponse;
 import gdg.sharinglog.repository.rotation.ChoreAssignmentAttemptRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class OccurrenceQueryService {
 
     private final RotationActorAccessService accessService;
     private final ChoreOccurrenceRepository occurrenceRepository;
     private final ChoreAssignmentAttemptRepository assignmentRepository;
     private final RotationViewMapper viewMapper;
-
-    public OccurrenceQueryService(
-            RotationActorAccessService accessService,
-            ChoreOccurrenceRepository occurrenceRepository,
-            ChoreAssignmentAttemptRepository assignmentRepository,
-            RotationViewMapper viewMapper
-    ) {
-        this.accessService = accessService;
-        this.occurrenceRepository = occurrenceRepository;
-        this.assignmentRepository = assignmentRepository;
-        this.viewMapper = viewMapper;
-    }
 
     @Transactional(readOnly = true)
     public OccurrenceListResponse findActiveOn(

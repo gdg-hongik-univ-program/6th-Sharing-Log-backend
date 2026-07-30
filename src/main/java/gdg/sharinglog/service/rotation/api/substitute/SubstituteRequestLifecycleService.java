@@ -7,22 +7,16 @@ import gdg.sharinglog.domain.rotation.ChoreOccurrence;
 import gdg.sharinglog.domain.rotation.SubstituteRecipientStatus;
 import gdg.sharinglog.repository.rotation.SubstituteRequestRecipientRepository;
 import gdg.sharinglog.repository.rotation.SubstituteRequestRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class SubstituteRequestLifecycleService {
 
     private final SubstituteRequestRepository requestRepository;
     private final SubstituteRequestRecipientRepository recipientRepository;
-
-    public SubstituteRequestLifecycleService(
-            SubstituteRequestRepository requestRepository,
-            SubstituteRequestRecipientRepository recipientRepository
-    ) {
-        this.requestRepository = requestRepository;
-        this.recipientRepository = recipientRepository;
-    }
 
     @Transactional
     public void cancelPendingForOccurrence(

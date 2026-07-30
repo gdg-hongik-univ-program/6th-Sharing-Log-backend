@@ -13,10 +13,12 @@ import gdg.sharinglog.repository.SharingGroupRepository;
 import gdg.sharinglog.repository.rotation.ChoreOccurrenceRepository;
 import gdg.sharinglog.repository.rotation.ChoreRepository;
 import gdg.sharinglog.repository.rotation.OccurrenceEligibleMemberRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class OccurrenceGenerationService {
 
     private final SharingGroupRepository sharingGroupRepository;
@@ -26,24 +28,6 @@ public class OccurrenceGenerationService {
     private final ChoreOccurrenceScheduleResolver scheduleResolver;
     private final ChoreEnrollmentService enrollmentService;
     private final RotationAssignmentService assignmentService;
-
-    public OccurrenceGenerationService(
-            SharingGroupRepository sharingGroupRepository,
-            ChoreRepository choreRepository,
-            ChoreOccurrenceRepository occurrenceRepository,
-            OccurrenceEligibleMemberRepository occurrenceEligibleMemberRepository,
-            ChoreOccurrenceScheduleResolver scheduleResolver,
-            ChoreEnrollmentService enrollmentService,
-            RotationAssignmentService assignmentService
-    ) {
-        this.sharingGroupRepository = sharingGroupRepository;
-        this.choreRepository = choreRepository;
-        this.occurrenceRepository = occurrenceRepository;
-        this.occurrenceEligibleMemberRepository = occurrenceEligibleMemberRepository;
-        this.scheduleResolver = scheduleResolver;
-        this.enrollmentService = enrollmentService;
-        this.assignmentService = assignmentService;
-    }
 
     @Transactional
     public ChoreOccurrence ensureCurrentOccurrence(Long choreId, Instant referenceInstant) {

@@ -11,10 +11,12 @@ import gdg.sharinglog.domain.rotation.RotationDecisionLog;
 import gdg.sharinglog.repository.rotation.ChoreAssignmentAttemptRepository;
 import gdg.sharinglog.repository.rotation.ChoreOccurrenceRepository;
 import gdg.sharinglog.repository.rotation.RotationDecisionLogRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class DirectAssignmentService {
 
     public static final String ALGORITHM_VERSION = "manual-action-v1";
@@ -22,16 +24,6 @@ public class DirectAssignmentService {
     private final ChoreAssignmentAttemptRepository assignmentRepository;
     private final ChoreOccurrenceRepository occurrenceRepository;
     private final RotationDecisionLogRepository decisionLogRepository;
-
-    public DirectAssignmentService(
-            ChoreAssignmentAttemptRepository assignmentRepository,
-            ChoreOccurrenceRepository occurrenceRepository,
-            RotationDecisionLogRepository decisionLogRepository
-    ) {
-        this.assignmentRepository = assignmentRepository;
-        this.occurrenceRepository = occurrenceRepository;
-        this.decisionLogRepository = decisionLogRepository;
-    }
 
     @Transactional
     public ChoreAssignmentAttempt assign(

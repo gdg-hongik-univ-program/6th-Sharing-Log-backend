@@ -1,5 +1,7 @@
 package gdg.sharinglog.service.rotation;
 
+import static gdg.sharinglog.domain.rotation.AssignmentEndReason.SAME_OCCURRENCE_EXCLUSIONS;
+
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
@@ -18,17 +20,13 @@ import gdg.sharinglog.repository.rotation.ChoreAssignmentAttemptRepository;
 import gdg.sharinglog.repository.rotation.ChoreOccurrenceRepository;
 import gdg.sharinglog.repository.rotation.OccurrenceEligibleMemberRepository;
 import gdg.sharinglog.service.rotation.api.substitute.SubstituteRequestLifecycleService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class OccurrenceCommandService {
-
-    private static final List<AssignmentEndReason> SAME_OCCURRENCE_EXCLUSIONS =
-            List.of(
-                    AssignmentEndReason.DECLINED_BY_ASSIGNEE,
-                    AssignmentEndReason.SUBSTITUTE_ACCEPTED
-            );
 
     private final SharingGroupRepository sharingGroupRepository;
     private final GroupMemberRepository groupMemberRepository;
@@ -38,26 +36,6 @@ public class OccurrenceCommandService {
     private final RotationAssignmentService assignmentService;
     private final DirectAssignmentService directAssignmentService;
     private final SubstituteRequestLifecycleService substituteRequestLifecycleService;
-
-    public OccurrenceCommandService(
-            SharingGroupRepository sharingGroupRepository,
-            GroupMemberRepository groupMemberRepository,
-            ChoreOccurrenceRepository occurrenceRepository,
-            ChoreAssignmentAttemptRepository assignmentRepository,
-            OccurrenceEligibleMemberRepository eligibilityRepository,
-            RotationAssignmentService assignmentService,
-            DirectAssignmentService directAssignmentService,
-            SubstituteRequestLifecycleService substituteRequestLifecycleService
-    ) {
-        this.sharingGroupRepository = sharingGroupRepository;
-        this.groupMemberRepository = groupMemberRepository;
-        this.occurrenceRepository = occurrenceRepository;
-        this.assignmentRepository = assignmentRepository;
-        this.eligibilityRepository = eligibilityRepository;
-        this.assignmentService = assignmentService;
-        this.directAssignmentService = directAssignmentService;
-        this.substituteRequestLifecycleService = substituteRequestLifecycleService;
-    }
 
     @Transactional
     public ChoreOccurrence complete(

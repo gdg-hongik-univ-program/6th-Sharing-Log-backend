@@ -17,26 +17,18 @@ import gdg.sharinglog.web.rotation.dto.MemberRefResponse;
 import gdg.sharinglog.web.rotation.error.RotationConflictException;
 import gdg.sharinglog.web.rotation.error.RotationForbiddenException;
 import gdg.sharinglog.web.rotation.error.RotationProblemCode;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class MemberLeaveApplicationService {
 
     private final RotationActorAccessService accessService;
     private final OccurrenceCommandService commandService;
     private final RotationViewMapper viewMapper;
-
-    public MemberLeaveApplicationService(
-            RotationActorAccessService accessService,
-            OccurrenceCommandService commandService,
-            RotationViewMapper viewMapper
-    ) {
-        this.accessService = accessService;
-        this.commandService = commandService;
-        this.viewMapper = viewMapper;
-    }
 
     @Transactional
     public MemberLeaveResponse leave(

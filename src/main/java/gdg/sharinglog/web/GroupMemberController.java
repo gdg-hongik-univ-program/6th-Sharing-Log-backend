@@ -2,6 +2,7 @@ package gdg.sharinglog.web;
 
 import gdg.sharinglog.service.group.GroupMemberQueryService;
 import gdg.sharinglog.web.dto.GroupMembersResponse;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
@@ -12,13 +13,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RequestMapping("/api/groups/{groupId}/members")
 @RestController
+@RequiredArgsConstructor
 public class GroupMemberController {
 
     private final GroupMemberQueryService groupMemberQueryService;
-
-    public GroupMemberController(GroupMemberQueryService groupMemberQueryService) {
-        this.groupMemberQueryService = groupMemberQueryService;
-    }
 
     @GetMapping
     public ResponseEntity<GroupMembersResponse> members(

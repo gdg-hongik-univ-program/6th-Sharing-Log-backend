@@ -9,6 +9,7 @@ import gdg.sharinglog.service.invitation.exception.InvitationUnavailableExceptio
 import gdg.sharinglog.service.invitation.result.AcceptedInvitation;
 import gdg.sharinglog.service.invitation.result.InvitationPreview;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -26,15 +27,12 @@ import org.springframework.web.util.HtmlUtils;
 import org.springframework.web.util.UriComponentsBuilder;
 
 @Controller
+@RequiredArgsConstructor
 public class InvitationAcceptanceController {
 
     private static final MediaType HTML_UTF8 = new MediaType(MediaType.TEXT_HTML, StandardCharsets.UTF_8);
 
     private final InvitationAcceptanceService acceptanceService;
-
-    public InvitationAcceptanceController(InvitationAcceptanceService acceptanceService) {
-        this.acceptanceService = acceptanceService;
-    }
 
     @GetMapping("/invite/{code}")
     @ResponseBody

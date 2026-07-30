@@ -14,11 +14,13 @@ import gdg.sharinglog.service.group.exception.GroupMemberAccessDeniedException;
 import gdg.sharinglog.service.group.exception.GroupNotFoundException;
 import gdg.sharinglog.service.group.result.GroupMembers;
 import gdg.sharinglog.service.user.AuthenticatedUserService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class GroupMemberQueryService {
 
     private static final Comparator<GroupMember> MEMBER_ORDER = Comparator
@@ -29,14 +31,6 @@ public class GroupMemberQueryService {
     private final SharingGroupRepository groupRepository;
     private final GroupMemberRepository groupMemberRepository;
     private final AuthenticatedUserService authenticatedUserService;
-
-    public GroupMemberQueryService(SharingGroupRepository groupRepository,
-                                   GroupMemberRepository groupMemberRepository,
-                                   AuthenticatedUserService authenticatedUserService) {
-        this.groupRepository = groupRepository;
-        this.groupMemberRepository = groupMemberRepository;
-        this.authenticatedUserService = authenticatedUserService;
-    }
 
     @Transactional(readOnly = true)
     public GroupMembers findMembers(Long groupId, String registrationId, OAuth2User oAuth2User) {
