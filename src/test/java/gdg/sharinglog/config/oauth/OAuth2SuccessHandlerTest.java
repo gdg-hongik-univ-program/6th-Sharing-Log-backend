@@ -48,7 +48,7 @@ class OAuth2SuccessHandlerTest {
     }
 
     @Test
-    void redirectsToFrontendEvenWhenInvitationRequestWasSaved() throws Exception {
+    void redirectsToSavedInvitationRequestAfterLogin() throws Exception {
         OAuth2UserPersistenceService persistenceService = mock(OAuth2UserPersistenceService.class);
         OAuth2SuccessHandler successHandler = new OAuth2SuccessHandler(
                 persistenceService,
@@ -78,6 +78,9 @@ class OAuth2SuccessHandlerTest {
         successHandler.onAuthenticationSuccess(callbackRequest, response, authentication);
 
         verify(persistenceService).saveOrUpdate("google", principal);
-        assertEquals(SUCCESS_URL, response.getRedirectedUrl());
+        assertEquals(
+                "http://localhost/invite/AbCdEfGhIjKlMnOpQrStUv?continue",
+                response.getRedirectedUrl()
+        );
     }
 }

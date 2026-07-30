@@ -4,6 +4,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -38,7 +39,10 @@ import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
+import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
+import org.springframework.security.web.savedrequest.SavedRequest;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
@@ -93,9 +97,29 @@ class InvitationAcceptanceWebTest {
 
     @Test
     void anonymousInvitationLinkRedirectsToLogin() throws Exception {
-        mockMvc.perform(get("/invite/{code}", INVITATION_CODE))
+        MvcResult result = mockMvc.perform(get("/invite/{code}", INVITATION_CODE))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(header().string("Location", endsWith("/login")));
+                .andExpect(header().string("Location", endsWith("/login")))
+                .andReturn();
+
+        SavedRequest savedRequest = new HttpSessionRequestCache()
+                .getRequest(result.getRequest(), result.getResponse());
+        assertNotNull(savedRequest);
+        assertEquals(
+                "http://localhost/invite/" + INVITATION_CODE + "?continue",
+                savedRequest.getRedirectUrl()
+        );
+    }
+
+    @Test
+    void invitationHtmlIsNotBlockedByApiCorsPolicy() throws Exception {
+        mockMvc.perform(get("/invite/{code}", INVITATION_CODE)
+                        .header("Origin", "https://untrusted.example")
+                        .with(oauthUser(INVITEE_PROVIDER_ID)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("초대 수락 테스트")))
+                .andExpect(content().string(containsString(
+                        "id=\"accept-invitation-button\"")));
     }
 
     @Test

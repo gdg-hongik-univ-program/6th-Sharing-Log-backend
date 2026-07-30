@@ -3,6 +3,9 @@ package gdg.sharinglog.config;
 import gdg.sharinglog.config.oauth.OAuth2FailureHandler;
 import gdg.sharinglog.config.oauth.OAuth2UserCustomService;
 import gdg.sharinglog.config.oauth.OAuth2SuccessHandler;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.Locale;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,6 +17,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.util.StringUtils;
 
 @Configuration
 @RequiredArgsConstructor
@@ -72,8 +76,9 @@ public class WebOAuthSecurityConfig {
             @Value("${app.frontend-origin}")
             String frontendOrigin
     ) {
+        String normalizedFrontendOrigin = normalizeFrontendOrigin(frontendOrigin);
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of(frontendOrigin));
+        configuration.setAllowedOrigins(List.of(normalizedFrontendOrigin));
         configuration.setAllowedMethods(List.of(
                 "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"
         ));
@@ -84,8 +89,57 @@ public class WebOAuthSecurityConfig {
 
         UrlBasedCorsConfigurationSource source =
                 new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
+        source.registerCorsConfiguration("/api/**", configuration);
         return source;
+    }
+
+    static String normalizeFrontendOrigin(String frontendOrigin) {
+        if (!StringUtils.hasText(frontendOrigin)) {
+            throw new IllegalArgumentException("app.frontend-origin은 비어 있을 수 없습니다.");
+        }
+
+        String normalized = frontendOrigin.strip().replaceFirst("/+$", "");
+        try {
+            URI origin = new URI(normalized);
+            String scheme = origin.getScheme();
+            boolean supportedScheme = "http".equalsIgnoreCase(scheme)
+                    || "https".equalsIgnoreCase(scheme);
+            boolean hasOnlyOriginComponents = origin.getHost() != null
+                    && origin.getUserInfo() == null
+                    && origin.getRawPath().isEmpty()
+                    && origin.getRawQuery() == null
+                    && origin.getRawFragment() == null;
+            if (!supportedScheme || !hasOnlyOriginComponents) {
+                throw invalidFrontendOrigin(frontendOrigin);
+            }
+
+            return new URI(
+                    scheme.toLowerCase(Locale.ROOT),
+                    null,
+                    origin.getHost().toLowerCase(Locale.ROOT),
+                    origin.getPort(),
+                    null,
+                    null,
+                    null
+            ).toASCIIString();
+        } catch (URISyntaxException exception) {
+            throw invalidFrontendOrigin(frontendOrigin, exception);
+        }
+    }
+
+    private static IllegalArgumentException invalidFrontendOrigin(String frontendOrigin) {
+        return invalidFrontendOrigin(frontendOrigin, null);
+    }
+
+    private static IllegalArgumentException invalidFrontendOrigin(
+            String frontendOrigin,
+            Exception cause
+    ) {
+        String message = "app.frontend-origin은 경로가 없는 http(s) origin이어야 합니다: "
+                + frontendOrigin;
+        return cause == null
+                ? new IllegalArgumentException(message)
+                : new IllegalArgumentException(message, cause);
     }
 
     private static boolean isApiLogoutRequest(jakarta.servlet.http.HttpServletRequest request) {

@@ -53,10 +53,25 @@ public class RotationViewMapper {
             ChoreOccurrence occurrence,
             RotationActor actor
     ) {
+        return occurrence(occurrence, actor, occurrence.getChore().getName());
+    }
+
+    public OccurrenceSummaryResponse completedOccurrence(
+            ChoreOccurrence occurrence,
+            RotationActor actor
+    ) {
+        return occurrence(occurrence, actor, occurrence.getChoreNameSnapshot());
+    }
+
+    private OccurrenceSummaryResponse occurrence(
+            ChoreOccurrence occurrence,
+            RotationActor actor,
+            String choreName
+    ) {
         return new OccurrenceSummaryResponse(
                 occurrence.getPublicId(),
                 occurrence.getChore().getPublicId(),
-                occurrence.getChoreNameSnapshot(),
+                choreName,
                 occurrence.getFrequencySnapshot(),
                 occurrence.getPeriodStart(),
                 occurrence.getPeriodEndExclusive(),
@@ -126,8 +141,6 @@ public class RotationViewMapper {
                 .filter(actor.membership().getId()::equals)
                 .isPresent()) {
             actions.add(OccurrenceSummaryResponse.AvailableAction.COMPLETE);
-            actions.add(OccurrenceSummaryResponse.AvailableAction.SKIP_ALREADY_DONE);
-            actions.add(OccurrenceSummaryResponse.AvailableAction.DECLINE);
             if (substituteRequestRepository
                     .findByOccurrence_IdAndActiveMarker(occurrence.getId(), 1)
                     .isEmpty()) {

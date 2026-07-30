@@ -324,9 +324,6 @@ public class ChoreOccurrence {
     }
 
     private void validateDecisionTime(Instant decidedAt) {
-        if (decidedAt.isBefore(createdAt)) {
-            throw new IllegalArgumentException("결정 시각은 회차 생성 시각보다 빠를 수 없습니다.");
-        }
         if (lastDecisionAt != null && decidedAt.isBefore(lastDecisionAt)) {
             throw new IllegalArgumentException("결정 시각은 이전 결정 시각보다 빠를 수 없습니다.");
         }

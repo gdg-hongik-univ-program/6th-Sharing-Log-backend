@@ -62,7 +62,9 @@ git checkout develop   # 또는 이 배포 설정이 merge된 브랜치
 cp .env.example .env
 nano .env
 # GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, NAVER_CLIENT_ID, NAVER_CLIENT_SECRET,
-# APP_FRONTEND_BASE_URL=https://<SSLIP_HOST>, APP_PUBLIC_BASE_URL=https://<SSLIP_HOST> 채우기
+# APP_FRONTEND_ORIGIN=https://<SSLIP_HOST>,
+# APP_OAUTH2_SUCCESS_URL=https://<SSLIP_HOST>/,
+# APP_PUBLIC_BASE_URL=https://<SSLIP_HOST> 채우기
 
 docker compose up -d --build
 docker compose logs -f   # "Started SharingLogApplication" 뜨는지 확인, Ctrl+C로 빠져나오기
@@ -118,13 +120,14 @@ sudo certbot --nginx -d <SSLIP_HOST>
 브라우저로 `https://<SSLIP_HOST>` 접속:
 
 1. "Google 계정으로 계속하기" 클릭
-2. 구글 로그인 완료 → 백엔드가 바로 `/house-choice`로 리다이렉트 (별도 콜백 확인 페이지 없음)
+2. 구글 로그인 완료 → 저장된 초대 요청이 있으면 초대 화면으로 복귀하고, 없으면 `APP_OAUTH2_SUCCESS_URL`로 이동
 3. "새 하우스를 만들고 싶어요" → 그룹 이름 입력 → `POST /api/groups` 201 확인
-4. 초대 링크 발급 화면에서 링크 복사 → 다른 계정/시크릿창으로 그 링크를 주소창에 붙여넣어 `/join-house`에서 붙여넣기 → 그룹 참여 성공 확인
+4. 초대 링크 발급 화면에서 링크 복사 → 다른 계정/시크릿창으로 링크 열기 → 로그인 → 초대 미리보기의 "그룹 가입하기" → 그룹 참여 성공 확인
 
 ## 문제 생겼을 때
 
 - **`redirect_uri_mismatch`**: 3단계에서 등록한 URI와 실제 접속 주소(https, 정확한 sslip 호스트)가 정확히 일치하는지 확인
-- **로그인 후 이상한 곳으로 감**: `.env`의 `APP_FRONTEND_BASE_URL`이 정확한지 확인 (`OAuth2SuccessHandler`가 이 값 + `/house-choice`로 리다이렉트함)
+- **로그인 후 이상한 곳으로 감**: `.env`의 `APP_OAUTH2_SUCCESS_URL`을 확인. 초대 링크로 로그인을 시작했다면 원래 `/invite/{code}` 요청이 세션에 저장됐는지도 확인
+- **`Invalid CORS request`**: `.env`의 `APP_FRONTEND_ORIGIN`이 실제 브라우저 origin과 정확히 같은지 확인. 경로나 끝 슬래시는 넣지 않는다
 - **그룹 생성이 403**: CSRF 토큰 문제일 가능성이 큼 — 프론트가 `GET /api/auth/csrf`를 먼저 호출해서 토큰을 받아오는지 확인
 - **백엔드 컨테이너가 안 뜸**: `docker compose logs`로 스택트레이스 확인 (대부분 `GOOGLE_CLIENT_ID`/`SECRET`/`NAVER_CLIENT_ID`/`SECRET` 중 하나 미설정)

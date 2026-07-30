@@ -44,6 +44,19 @@ public class HomeController {
                             <p class="copy">%s</p>
 
                             <hr>
+                            <h2>초대 링크로 참가</h2>
+                            <p>받은 초대 링크나 22자 초대 코드를 입력해 주세요.</p>
+                            <form id="join-invitation-form">
+                                <p>
+                                    <label for="join-invitation-input">초대 링크 또는 코드</label><br>
+                                    <input id="join-invitation-input" name="invitation" type="text"
+                                           autocomplete="off" required>
+                                    <button id="join-invitation-button" type="submit">초대 확인</button>
+                                </p>
+                            </form>
+                            <p id="join-invitation-result" role="status" aria-live="polite"></p>
+
+                            <hr>
                             <h2>그룹 생성 및 초대 링크 확인</h2>
                             <p>발급 결과에서 APP_PUBLIC_BASE_URL 적용 여부를 확인할 수 있습니다.</p>
                             <form id="group-form">

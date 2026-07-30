@@ -16,8 +16,24 @@
     const loadMembersButton = document.querySelector("#load-members-button");
     const memberListResult = document.querySelector("#member-list-result");
     const rotationLink = document.querySelector("#rotation-link");
+    const joinInvitationForm = document.querySelector("#join-invitation-form");
+    const joinInvitationInput = document.querySelector("#join-invitation-input");
+    const joinInvitationResult = document.querySelector("#join-invitation-result");
 
     let createdGroupId = null;
+    const invitationCodePattern = /^[A-Za-z0-9_-]{22}$/;
+
+    joinInvitationForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        joinInvitationResult.textContent = "";
+
+        try {
+            const code = parseInvitationCode(joinInvitationInput.value);
+            window.location.assign(`/invite/${encodeURIComponent(code)}`);
+        } catch (error) {
+            joinInvitationResult.textContent = errorMessage(error);
+        }
+    });
 
     groupForm.addEventListener("submit", async (event) => {
         event.preventDefault();
@@ -173,6 +189,36 @@
         }
         const groupId = Number(value);
         return Number.isSafeInteger(groupId) && groupId > 0 ? groupId : null;
+    }
+
+    function parseInvitationCode(value) {
+        const candidate = typeof value === "string" ? value.trim() : "";
+        if (invitationCodePattern.test(candidate)) {
+            return candidate;
+        }
+
+        let invitationUrl;
+        try {
+            invitationUrl = new URL(candidate, window.location.origin);
+        } catch (error) {
+            throw new Error("올바른 초대 링크나 22자 초대 코드를 입력해 주세요.");
+        }
+
+        if (invitationUrl.origin !== window.location.origin) {
+            throw new Error("다른 서비스의 초대 링크는 사용할 수 없습니다.");
+        }
+        if (invitationUrl.search || invitationUrl.hash
+                || invitationUrl.username || invitationUrl.password) {
+            throw new Error("올바른 초대 링크나 22자 초대 코드를 입력해 주세요.");
+        }
+
+        const pathMatch = invitationUrl.pathname.match(
+            /^\/invite\/([A-Za-z0-9_-]{22})$/
+        );
+        if (!pathMatch) {
+            throw new Error("올바른 초대 링크나 22자 초대 코드를 입력해 주세요.");
+        }
+        return pathMatch[1];
     }
 
     async function getCsrfToken() {

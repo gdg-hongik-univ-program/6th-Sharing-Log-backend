@@ -188,7 +188,11 @@
                     }
                 );
                 status.textContent = "대타 요청을 보냈습니다.";
-                await loadOccurrences();
+                substituteBox.value = "OUTBOX";
+                await Promise.all([
+                    loadOccurrences(),
+                    loadSubstituteRequests()
+                ]);
             } catch (error) {
                 status.textContent = errorMessage(error);
                 button.disabled = false;
@@ -198,16 +202,10 @@
 
         const paths = {
             COMPLETE: "complete",
-            SKIP_ALREADY_DONE: "skip-already-done",
-            DECLINE: "decline",
             RETRY_ASSIGNMENT: "retry-assignment",
             UNDO_COMPLETE: "undo-complete"
         };
         let body = {};
-        if (action === "SKIP_ALREADY_DONE"
-            || action === "DECLINE") {
-            body = {note: window.prompt("메모를 남길 수 있어요.", "") || null};
-        }
         if (action === "UNDO_COMPLETE") {
             const note = window.prompt("완료 취소 메모를 남길 수 있어요.", "");
             if (note === null) {
@@ -1055,8 +1053,8 @@
     const LABELS = {
         status: {ASSIGNED: "배정됨", COMPLETED: "완료", SKIPPED: "생략", NEEDS_ATTENTION: "관리 필요"},
         action: {
-            COMPLETE: "업무 완료", SKIP_ALREADY_DONE: "이미 처리됨", DECLINE: "이번 회차는 어려워요",
-            REQUEST_SUBSTITUTE: "대타 요청", RETRY_ASSIGNMENT: "자동 배정 다시 시도", UNDO_COMPLETE: "완료 취소"
+            COMPLETE: "업무 완료", REQUEST_SUBSTITUTE: "대타 요청",
+            RETRY_ASSIGNMENT: "자동 배정 다시 시도", UNDO_COMPLETE: "완료 취소"
         },
         requestStatus: {PENDING: "응답 대기", ACCEPTED: "수락됨", EXHAUSTED: "전원 거절", CANCELLED: "취소됨"},
         recipientStatus: {PENDING: "대기", ACCEPTED: "수락", DECLINED: "거절", INELIGIBLE: "응답 종료"},

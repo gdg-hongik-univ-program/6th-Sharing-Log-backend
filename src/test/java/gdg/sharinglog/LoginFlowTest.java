@@ -1,6 +1,7 @@
 package gdg.sharinglog;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oauth2Login;
@@ -18,8 +19,10 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
 
-@SpringBootTest(properties =
-        "app.oauth2-failure-url=https://6th-sharing-log-frontend-teal.vercel.app/?error=true")
+@SpringBootTest(properties = {
+        "app.frontend-origin=https://6th-sharing-log-frontend-teal.vercel.app/",
+        "app.oauth2-failure-url=https://6th-sharing-log-frontend-teal.vercel.app/?error=true"
+})
 @AutoConfigureMockMvc
 class LoginFlowTest {
 
@@ -81,6 +84,22 @@ class LoginFlowTest {
     }
 
     @Test
+    void rejectsApiCorsRequestFromUnknownOrigin() throws Exception {
+        mockMvc.perform(options("/api/auth/csrf")
+                        .header("Origin", "https://untrusted.example")
+                        .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void invitationPageIsNotBlockedByApiCorsPolicy() throws Exception {
+        mockMvc.perform(get("/invite/AbCdEfGhIjKlMnOpQrStUv")
+                        .header("Origin", "https://untrusted.example"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(header().string("Location", endsWith("/login")));
+    }
+
+    @Test
     void homeShowsAuthenticatedGoogleUser() throws Exception {
         mockMvc.perform(get("/").with(oauth2Login()
                         .attributes(attributes -> {
@@ -92,7 +111,12 @@ class LoginFlowTest {
                 .andExpect(content().string(containsString("test@example.com")))
                 .andExpect(content().string(containsString("id=\"group-form\"")))
                 .andExpect(content().string(containsString("id=\"create-group-button\"")))
+                .andExpect(content().string(containsString("id=\"join-invitation-form\"")))
+                .andExpect(content().string(containsString("id=\"join-invitation-input\"")))
+                .andExpect(content().string(containsString("id=\"join-invitation-result\"")))
                 .andExpect(content().string(containsString("id=\"issue-invitation-button\"")))
+                .andExpect(content().string(containsString(
+                        "<input id=\"invite-url\" type=\"text\" readonly>")))
                 .andExpect(content().string(containsString("id=\"invite-link\"")))
                 .andExpect(content().string(containsString("id=\"members-form\"")))
                 .andExpect(content().string(containsString("id=\"member-list-result\"")))
@@ -113,7 +137,11 @@ class LoginFlowTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("/api/auth/csrf")))
                 .andExpect(content().string(containsString("/api/groups")))
-                .andExpect(content().string(containsString("/members")));
+                .andExpect(content().string(containsString("/members")))
+                .andExpect(content().string(containsString(
+                        "invitationUrl.origin !== window.location.origin")))
+                .andExpect(content().string(containsString(
+                        "window.location.assign(`/invite/${encodeURIComponent(code)}`)")));
     }
 
     // POST /api/auth/logout 호출 시 204가 오고 세션이 invalid 처리되는지 확인

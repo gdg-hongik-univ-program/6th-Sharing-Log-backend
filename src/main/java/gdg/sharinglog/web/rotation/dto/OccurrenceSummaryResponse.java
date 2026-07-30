@@ -27,8 +27,6 @@ public record OccurrenceSummaryResponse(
 
     public enum AvailableAction {
         COMPLETE,
-        SKIP_ALREADY_DONE,
-        DECLINE,
         REQUEST_SUBSTITUTE,
         RETRY_ASSIGNMENT,
         UNDO_COMPLETE

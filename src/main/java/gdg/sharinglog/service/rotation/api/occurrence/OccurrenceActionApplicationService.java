@@ -76,62 +76,6 @@ public class OccurrenceActionApplicationService {
     }
 
     @Transactional
-    public OccurrenceActionResponse skipAlreadyDone(
-            String groupPublicId,
-            String occurrencePublicId,
-            String registrationId,
-            OAuth2User principal,
-            long expectedVersion,
-            String note,
-            Instant actedAt
-    ) {
-        ActionContext context = requireAssigneeAction(
-                groupPublicId,
-                occurrencePublicId,
-                registrationId,
-                principal,
-                expectedVersion
-        );
-        ChoreOccurrence occurrence = commandService.skipAlreadyDone(
-                occurrencePublicId,
-                context.actor().membership().getPublicId(),
-                actedAt,
-                note
-        );
-        return response(OccurrenceActionResponse.Outcome.SKIPPED, occurrence, null, null);
-    }
-
-    @Transactional
-    public OccurrenceActionResponse decline(
-            String groupPublicId,
-            String occurrencePublicId,
-            String registrationId,
-            OAuth2User principal,
-            long expectedVersion,
-            String note,
-            Instant actedAt
-    ) {
-        ActionContext context = requireAssigneeAction(
-                groupPublicId,
-                occurrencePublicId,
-                registrationId,
-                principal,
-                expectedVersion
-        );
-        ChoreOccurrence occurrence = commandService.declineCurrentOccurrence(
-                occurrencePublicId,
-                context.actor().membership().getPublicId(),
-                actedAt,
-                note
-        );
-        OccurrenceActionResponse.Outcome outcome =
-                occurrence.getStatus() == OccurrenceStatus.ASSIGNED
-                        ? OccurrenceActionResponse.Outcome.REASSIGNED
-                        : OccurrenceActionResponse.Outcome.NEEDS_ATTENTION;
-        return response(outcome, occurrence, null, null);
-    }
-
-    @Transactional
     public OccurrenceActionResponse undoCompletion(
             String groupPublicId,
             String occurrencePublicId,

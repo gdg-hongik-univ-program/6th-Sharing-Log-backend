@@ -8,7 +8,7 @@
 
 ## 1. 목적과 범위
 
-이 문서는 매일·매주·격주 업무 정의, 가능 멤버, 회차 조회, 완료·생략·수행 불가, 대타 요청, 완료 취소, `NEEDS_ATTENTION` 복구, 멤버 탈퇴 재배정을 위한 REST API 계약을 정의한다.
+이 문서는 매일·매주·격주 업무 정의, 가능 멤버, 회차 조회, 완료, 대타 요청, 완료 취소, `NEEDS_ATTENTION` 복구, 멤버 탈퇴 재배정을 위한 REST API 계약을 정의한다.
 
 정책과 API가 충돌하면 `rotation-policy.md`가 우선한다. 자동 배정은 선택 순서가 아니라 공정성 점수로 후보를 좁힌 뒤 최종 동점자 사이에서 무작위 선택한다. 와이어프레임의 동작은 다음과 같이 연결한다.
 
@@ -17,8 +17,6 @@
 | 매일·매주·격주 탭 | `GET /occurrences`의 `frequency` 필터 |
 | 내 업무의 `업무 완료` | `POST /occurrences/{occurrenceId}/complete` |
 | `대타 요청` | `POST /occurrences/{occurrenceId}/substitute-requests` |
-| `이번 회차는 어려워요` | `POST /occurrences/{occurrenceId}/decline`으로 즉시 공정 재배정 |
-| 새 `이미 처리되어서 생략했어요` | `POST /skip-already-done` |
 | 전체 완료 업무 목록 | `GET /occurrences/completed-history` |
 | `완료 취소` | `POST /occurrences/{occurrenceId}/undo-complete` |
 | 관리자 관리 필요 목록 | `GET /occurrences?status=NEEDS_ATTENTION` 및 `POST /retry-assignment` |
@@ -38,7 +36,7 @@
 |---|---|
 | 업무·회차 조회 | 활성 그룹 멤버 |
 | 업무 생성·수정·비활성화, 가능 멤버 변경 | `OWNER` |
-| 완료·이미 처리됨·이번 회차 불가 | 해당 회차의 현재 담당자 |
+| 완료 | 해당 회차의 현재 담당자 |
 | 대타 요청 생성 | 해당 회차의 현재 담당자 |
 | 대타 수락·거절 | 요청 생성 당시의 활성 수신 멤버 |
 | 대타 요청 조회 | 요청자, 수신자, `OWNER` |
@@ -47,7 +45,7 @@
 | 본인 탈퇴 | 해당 활성 멤버 |
 | 다른 멤버 내보내기 | `OWNER` |
 
-`OWNER`라도 다른 담당자를 대신해 완료·생략·수행 불가·대타 응답·완료 취소를 기록할 수 없다.
+`OWNER`라도 다른 담당자를 대신해 완료·대타 응답·완료 취소를 기록할 수 없다.
 
 ### 2.2 외부 식별자
 
@@ -95,7 +93,7 @@ If-Match: "7"
 - 오래된 버전: `409 VERSION_CONFLICT`
 - 올바른 버전이지만 허용되지 않는 상태 전이: `409 INVALID_OCCURRENCE_STATE`
 
-같은 회차에 완료와 수행 불가가 동시에 도착하면 먼저 커밋된 요청만 성공한다. 나머지 요청은 `409 VERSION_CONFLICT`를 받으며 서버가 자동으로 다른 상태 전이를 시도하지 않는다.
+같은 회차에 여러 변경 요청이 동시에 도착하면 먼저 커밋된 요청만 성공한다. 나머지 요청은 `409 VERSION_CONFLICT`를 받으며 서버가 자동으로 다른 상태 전이를 시도하지 않는다.
 
 - 대타 요청 생성은 회차의 `version`을 사용한다.
 - 대타 수락·거절은 대타 요청의 `version`을 사용한다.
@@ -227,7 +225,7 @@ API는 사용자 계정 ID나 이메일 대신 그룹 멤버십의 공개 UUID�
 
 ### 3.3 회차 요약
 
-목록 응답은 다음 요약 표현을 사용한다. 상태 변경 응답은 화면을 즉시 갱신하는 데 필요한 `occurrenceId`, `status`, `currentAssignee`, `lastAssignee`, `attention`, `closedAt`, `version`만 담은 축약형을 사용하며, 최신 전체 표현과 이력은 단건 조회로 가져온다.
+목록 응답은 다음 요약 표현을 사용한다. 현재 회차 목록의 `choreName`은 업무 정의의 최신 이름을 사용하고, 완료 이력의 `choreName`은 회차 생성 당시 이름 스냅샷을 사용한다. 상태 변경 응답은 화면을 즉시 갱신하는 데 필요한 `occurrenceId`, `status`, `currentAssignee`, `lastAssignee`, `attention`, `closedAt`, `version`만 담은 축약형을 사용하며, 최신 전체 표현과 이력은 단건 조회로 가져온다.
 
 ```json
 {
@@ -258,7 +256,7 @@ API는 사용자 계정 ID나 이메일 대신 그룹 멤버십의 공개 UUID�
 - `NEEDS_ATTENTION`: `currentAssignee`가 없고 `attention`이 반드시 있다.
 - `COMPLETED`, `SKIPPED`: `currentAssignee`가 없고 `lastAssignee`와 `closedAt`이 있다.
 - 재배정 실패로 `NEEDS_ATTENTION`이 된 경우 `lastAssignee`에는 직전에 종료된 담당자가 있을 수 있다. 이는 현재 담당자가 아니다.
-- `availableActions`는 로그인한 요청자 기준이다. 현재 담당자에게는 `COMPLETE`, `SKIP_ALREADY_DONE`, `DECLINE`과 진행 중 요청이 없을 때 `REQUEST_SUBSTITUTE`가 포함된다. 마지막 유효 완료자에게는 `UNDO_COMPLETE`, 관리자에게는 필요한 경우 `RETRY_ASSIGNMENT`가 포함된다.
+- `availableActions`는 로그인한 요청자 기준이다. 현재 담당자에게는 `COMPLETE`와 진행 중 요청이 없을 때 `REQUEST_SUBSTITUTE`가 포함된다. 마지막 유효 완료자에게는 `UNDO_COMPLETE`, 관리자에게는 필요한 경우 `RETRY_ASSIGNMENT`가 포함된다.
 
 관리 필요 정보의 형식은 다음과 같다.
 
@@ -402,6 +400,11 @@ API는 사용자 계정 ID나 이메일 대신 그룹 멤버십의 공개 UUID�
 
 이력 enum은 다음과 같다.
 
+`SKIPPED`, `SKIPPED_ALREADY_DONE`, `DECLINED_BY_ASSIGNEE`,
+`DECLINE_REASSIGNMENT`, `DECLINED_CURRENT_OCCURRENCE`는 기존 감사 이력을
+역직렬화하고 진행 중인 레거시 회차를 안전하게 처리하기 위한 읽기 호환 값이다.
+새 공개 API는 이 값을 생성하지 않는다.
+
 | 필드 | 값 |
 |---|---|
 | 회차 상태 | `ASSIGNED`, `COMPLETED`, `SKIPPED`, `NEEDS_ATTENTION` |
@@ -423,8 +426,6 @@ API는 사용자 계정 ID나 이메일 대신 그룹 멤버십의 공개 UUID�
 | `GET` | `/api/groups/{groupId}/occurrences` | 주기·기간·상태별 회차 목록 | `200` |
 | `GET` | `/api/groups/{groupId}/occurrences/completed-history` | 전체 또는 내 완료 업무 이력 | `200` |
 | `POST` | `/api/groups/{groupId}/occurrences/{occurrenceId}/complete` | 실제 완료 | `200` |
-| `POST` | `/api/groups/{groupId}/occurrences/{occurrenceId}/skip-already-done` | 이미 처리됨으로 생략 | `200` |
-| `POST` | `/api/groups/{groupId}/occurrences/{occurrenceId}/decline` | 이번 회차 수행 불가 및 자동 재배정 | `200` |
 | `POST` | `/api/groups/{groupId}/occurrences/{occurrenceId}/undo-complete` | 완료 취소 및 같은 멤버로 복원 | `200` |
 | `POST` | `/api/groups/{groupId}/occurrences/{occurrenceId}/substitute-requests` | 대타 요청 생성 | `201` |
 | `GET` | `/api/groups/{groupId}/substitute-requests` | 받은·보낸·전체 대타 요청 조회 | `200` |
@@ -758,137 +759,16 @@ ETag: "5"
 - 해당 멤버의 같은 업무 실제 완료 횟수 1 증가
 - 같은 멱등 키가 반복되어도 점수는 한 번만 증가
 
-### 7.2 이미 처리되어서 생략
-
-```http
-POST /api/groups/{groupId}/occurrences/{occurrenceId}/skip-already-done
-Content-Type: application/json
-Idempotency-Key: ffffffff-ffff-4fff-8fff-ffffffffffff
-If-Match: "4"
-```
-
-```json
-{
-  "note": "입주자 전체 청소 때 이미 처리됐어요."
-}
-```
-
-`note`는 선택이며 공백 제거 후 최대 300자다.
-
-성공:
-
-```json
-{
-  "outcome": "SKIPPED",
-  "occurrence": {
-    "occurrenceId": "33333333-3333-4333-8333-333333333333",
-    "status": "SKIPPED",
-    "currentAssignee": null,
-    "lastAssignee": {
-      "membershipId": "55555555-5555-4555-8555-555555555555",
-      "displayName": "이민준",
-      "avatarUrl": null,
-      "status": "ACTIVE"
-    },
-    "attention": null,
-    "closedAt": "2026-07-23T14:02:00Z",
-    "version": 5
-  }
-}
-```
-
-효과:
-
-- 회차 `SKIPPED`
-- 현재 배정 종료 사유 `SKIPPED_ALREADY_DONE`
-- 완료 횟수와 현재 기간 업무량에 반영하지 않음
-- 이력은 보존하지만 실제 수행 완료로 집계하지 않음
-
-### 7.3 이번 회차는 어려워요
-
-```http
-POST /api/groups/{groupId}/occurrences/{occurrenceId}/decline
-Content-Type: application/json
-Idempotency-Key: 77777777-7777-4777-8777-777777777777
-If-Match: "4"
-```
-
-```json
-{
-  "note": "오늘 야근이라 이번 회차는 어려워요."
-}
-```
-
-후보가 있어 재배정된 응답:
-
-```json
-{
-  "outcome": "REASSIGNED",
-  "occurrence": {
-    "occurrenceId": "33333333-3333-4333-8333-333333333333",
-    "status": "ASSIGNED",
-    "currentAssignee": {
-      "membershipId": "66666666-6666-4666-8666-666666666666",
-      "displayName": "박서연",
-      "avatarUrl": null,
-      "status": "ACTIVE"
-    },
-    "lastAssignee": null,
-    "attention": null,
-    "closedAt": null,
-    "version": 5
-  }
-}
-```
-
-후보가 없어 관리 필요가 된 응답:
-
-```json
-{
-  "outcome": "NEEDS_ATTENTION",
-  "occurrence": {
-    "occurrenceId": "33333333-3333-4333-8333-333333333333",
-    "status": "NEEDS_ATTENTION",
-    "currentAssignee": null,
-    "lastAssignee": {
-      "membershipId": "55555555-5555-4555-8555-555555555555",
-      "displayName": "이민준",
-      "avatarUrl": null,
-      "status": "ACTIVE"
-    },
-    "attention": {
-      "reason": "NO_ACTIVE_ELIGIBLE_NON_DECLINED_CANDIDATE",
-      "since": "2026-07-23T14:05:00Z",
-      "lastDecisionAt": "2026-07-23T14:05:00Z"
-    },
-    "closedAt": null,
-    "version": 5
-  }
-}
-```
-
-두 경우 모두 `200 OK`다.
-
-처리 순서:
-
-1. 현재 배정을 `DECLINED_BY_ASSIGNEE`로 종료한다.
-2. 요청 멤버를 이 회차의 후보에서 영구 제외한다.
-3. 같은 공정 배정 엔진으로 즉시 재배정한다.
-4. 후보가 있으면 `DECLINE_REASSIGNMENT` 배정을 추가한다.
-5. 후보가 없으면 현재 담당자를 비우고 `NEEDS_ATTENTION`으로 둔다.
-
-수행 불가는 취소할 수 없고 같은 회차에서 해당 멤버를 다시 후보로 넣지 않는다. 다음 회차에서는 다시 정상 후보가 된다.
-
-### 7.4 담당자 행동 오류
+### 7.2 담당자 행동 오류
 
 | 상황 | 응답 |
 |---|---|
 | 로그인 멤버가 현재 담당자가 아님 | `403 NOT_CURRENT_ASSIGNEE` |
 | 회차가 `ASSIGNED`가 아님 | `409 INVALID_OCCURRENCE_STATE` |
 | 읽은 뒤 다른 요청이 상태 변경 | `409 VERSION_CONFLICT` |
-| 종료 회차를 다시 완료·생략·거절 | `409 INVALID_OCCURRENCE_STATE` |
+| 종료 회차를 다시 완료 | `409 INVALID_OCCURRENCE_STATE` |
 
-### 7.5 전체 완료 이력과 완료 취소
+### 7.3 전체 완료 이력과 완료 취소
 
 ```http
 GET /api/groups/{groupId}/occurrences/completed-history?mineOnly=false&choreId={choreId}
@@ -912,7 +792,7 @@ If-Match: "{occurrenceVersion}"
 
 마지막 유효 완료자인 활성 멤버만 호출할 수 있다. 기존 완료 배정은 삭제하지 않고 취소 시각·취소자·선택 메모를 남긴다. 회차는 `ASSIGNED`로 바뀌며 같은 멤버에게 `COMPLETION_REOPENED` 배정을 추가한다. 성공 응답의 `outcome`은 `COMPLETION_UNDONE`이다. `SKIPPED`는 취소할 수 없다.
 
-### 7.6 대타 요청
+### 7.4 대타 요청
 
 생성:
 
@@ -952,7 +832,7 @@ If-Match: "{requestVersion}"
 
 - 첫 유효 수락자가 담당자가 된다. 원 배정은 `SUBSTITUTE_ACCEPTED`, 새 직접 배정은 `SUBSTITUTE_ACCEPTANCE`로 기록하고 다른 수신자는 `INELIGIBLE`이 된다.
 - 거절은 해당 수신자만 `DECLINED`로 바꾼다. 응답 가능한 수신자가 없으면 요청은 `EXHAUSTED`가 되지만 원 담당자는 유지된다.
-- 완료·생략·수행 불가·현재 담당자의 탈퇴 또는 참여 제외 시 진행 중 요청은 `CANCELLED`가 된다. 일반 수신자의 탈퇴·참여 제외는 해당 수신자만 `INELIGIBLE`로 바꾼다.
+- 완료·현재 담당자의 탈퇴 또는 참여 제외 시 진행 중 요청은 `CANCELLED`가 된다. 일반 수신자의 탈퇴·참여 제외는 해당 수신자만 `INELIGIBLE`로 바꾼다.
 - 대타 수락은 공정 랜덤 재실행이 아니라 사용자의 명시적 수락에 따른 직접 배정이다.
 
 ## 8. `NEEDS_ATTENTION` 재시도
@@ -986,7 +866,7 @@ If-Match: "5"
 - 현재 업무 버전이 달라졌으면 `409 CHORE_VERSION_CONFLICT`다.
 - 새 가능 멤버 조건을 회차에 복사하고 `eligibilitySnapshot.version`을 1 증가시킨다.
 - 기존 스냅샷과 변경 감사 이력은 삭제하지 않는다.
-- 어느 방식을 사용해도 그 회차에서 이미 수행 불가를 선택한 멤버는 다시 후보가 되지 않는다.
+- 어느 방식을 사용해도 그 회차에 레거시 수행 불가 이력이 있는 멤버는 다시 후보가 되지 않는다.
 
 재배정 성공:
 
@@ -1170,7 +1050,7 @@ API 구현은 어느 진입점에서도 다음 조건을 깨뜨리면 안 된다
 2. `ASSIGNED`는 현재 담당자와 활성 배정을 정확히 하나 가진다.
 3. `NEEDS_ATTENTION`, `COMPLETED`, `SKIPPED`는 현재 담당자와 활성 배정이 없다.
 4. 현재 담당자는 같은 그룹의 활성 가능 멤버다.
-5. 같은 회차에서 수행 불가를 선택한 멤버는 재시도나 탈퇴 재배정에서도 다시 배정되지 않는다.
+5. 같은 회차에 레거시 수행 불가 이력이 있는 멤버는 재시도나 탈퇴 재배정에서도 다시 배정되지 않는다.
 6. `COMPLETED`만 같은 업무 완료 횟수를 증가시킨다.
 7. `SKIPPED`는 완료 횟수와 현재 기간 업무량을 증가시키지 않는다.
 8. 담당자 변경은 기존 배정을 종료하고 새 이력을 추가하는 방식으로만 수행한다.
