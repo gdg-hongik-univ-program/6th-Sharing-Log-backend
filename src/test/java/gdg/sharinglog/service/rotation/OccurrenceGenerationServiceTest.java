@@ -29,6 +29,8 @@ import gdg.sharinglog.repository.rotation.ChoreOccurrenceRepository;
 import gdg.sharinglog.repository.rotation.ChoreRepository;
 import gdg.sharinglog.repository.rotation.RotationDecisionLogRepository;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
@@ -89,6 +91,51 @@ class OccurrenceGenerationServiceTest {
                 context.ownerMembership().getId(),
                 first.currentAssignee().orElseThrow().getId()
         );
+    }
+
+    @ParameterizedTest
+    @EnumSource(ChoreFrequency.class)
+    void createsOccurrenceWhenDatabaseRoundsHighPrecisionCreationTime(
+            ChoreFrequency frequency
+    ) {
+        Context context = context("high-precision-" + frequency);
+        Instant reference = Instant.parse("2026-07-23T03:00:00.123456789Z");
+        Chore chore = switch (frequency) {
+            case DAILY -> Chore.daily(
+                    context.group(),
+                    context.ownerMembership(),
+                    "일간 업무",
+                    ChoreEligibilityMode.ALL_ACTIVE_MEMBERS,
+                    LocalTime.of(20, 0),
+                    reference
+            );
+            case WEEKLY -> Chore.weekly(
+                    context.group(),
+                    context.ownerMembership(),
+                    "주간 업무",
+                    ChoreEligibilityMode.ALL_ACTIVE_MEMBERS,
+                    DayOfWeek.SUNDAY,
+                    LocalTime.of(20, 0),
+                    reference
+            );
+            case BIWEEKLY -> Chore.biweekly(
+                    context.group(),
+                    context.ownerMembership(),
+                    "격주 업무",
+                    ChoreEligibilityMode.ALL_ACTIVE_MEMBERS,
+                    LocalDate.of(2026, 7, 20),
+                    LocalTime.of(20, 0),
+                    reference
+            );
+        };
+        choreRepository.save(chore);
+
+        ChoreOccurrence occurrence =
+                generationService.ensureCurrentOccurrence(chore.getId(), reference);
+
+        assertEquals(OccurrenceStatus.ASSIGNED, occurrence.getStatus());
+        assertEquals(1, assignmentRepository.countByOccurrence_Id(occurrence.getId()));
+        assertEquals(1, decisionLogRepository.countByOccurrence_Id(occurrence.getId()));
     }
 
     @Test

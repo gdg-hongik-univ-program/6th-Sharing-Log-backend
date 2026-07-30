@@ -51,6 +51,7 @@ public class OccurrenceQueryService {
         List<ChoreOccurrence> occurrences = occurrenceRepository
                 .findAllActiveOn(actor.group().getId(), effectiveDate)
                 .stream()
+                .filter(item -> item.getChore().isActive())
                 .filter(item -> frequency == null || item.getFrequencySnapshot() == frequency)
                 .filter(item -> effectiveStatuses.isEmpty()
                         || effectiveStatuses.contains(item.getStatus()))
@@ -93,7 +94,7 @@ public class OccurrenceQueryService {
                 .filter(item -> !mineOnly || completedBy(item, actor.membership()))
                 .toList();
         var items = completed.stream()
-                .map(item -> viewMapper.occurrence(item, actor))
+                .map(item -> viewMapper.completedOccurrence(item, actor))
                 .toList();
         return new CompletedOccurrenceHistoryResponse(
                 actor.group().getPublicId(),

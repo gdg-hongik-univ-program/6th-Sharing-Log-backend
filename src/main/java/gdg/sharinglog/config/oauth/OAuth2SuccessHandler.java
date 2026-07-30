@@ -23,9 +23,9 @@ public class OAuth2SuccessHandler
     ) {
         this.userPersistenceService = userPersistenceService;
         setDefaultTargetUrl(successUrl);
-        // 로그인 성공 후 이전 요청 주소를 무시하고
-        // React 프론트엔드의 그룹 선택 화면으로 항상 이동
-        setAlwaysUseDefaultTargetUrl(true);
+        // 초대 링크처럼 로그인 전에 저장된 요청이 있으면 해당 요청으로 돌아가고,
+        // 저장된 요청이 없을 때만 기본 성공 URL을 사용한다.
+        setAlwaysUseDefaultTargetUrl(false);
     }
 
     @Override

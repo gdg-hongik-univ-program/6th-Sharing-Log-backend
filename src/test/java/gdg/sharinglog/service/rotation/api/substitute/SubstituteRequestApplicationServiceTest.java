@@ -69,6 +69,46 @@ class SubstituteRequestApplicationServiceTest {
     EntityManager entityManager;
 
     @Test
+    void createdRequestAppearsInRequesterOutbox() {
+        List<GroupMember> members = members();
+        SharingGroup group = members.getFirst().getGroup();
+        Chore chore = choreRepository.save(Chore.daily(
+                group,
+                members.getFirst(),
+                "공용 청소",
+                ChoreEligibilityMode.ALL_ACTIVE_MEMBERS,
+                LocalTime.of(21, 0),
+                REFERENCE.minusSeconds(60)
+        ));
+        var occurrence = generationService.ensureCurrentOccurrence(chore.getId(), REFERENCE);
+        entityManager.flush();
+        entityManager.refresh(occurrence);
+        GroupMember requester = occurrence.currentAssignee().orElseThrow();
+
+        var created = service.create(
+                group.getPublicId(),
+                occurrence.getPublicId(),
+                "google",
+                principal(requester),
+                occurrence.getVersion(),
+                "외부 일정이 있어요.",
+                REFERENCE.plusSeconds(60)
+        );
+
+        var outbox = service.findAll(
+                group.getPublicId(),
+                "google",
+                principal(requester),
+                SubstituteRequestBox.OUTBOX,
+                null
+        );
+
+        assertEquals(SubstituteRequestBox.OUTBOX, outbox.box());
+        assertEquals(1, outbox.totalCount());
+        assertEquals(created.requestId(), outbox.items().getFirst().requestId());
+    }
+
+    @Test
     void exhaustedRequestCanBeRetriedAndFirstAcceptanceTransfersAssignment() {
         List<GroupMember> members = members();
         SharingGroup group = members.getFirst().getGroup();

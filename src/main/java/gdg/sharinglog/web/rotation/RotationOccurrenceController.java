@@ -94,66 +94,6 @@ public class RotationOccurrenceController {
         );
     }
 
-    @PostMapping("/{occurrenceId}/skip-already-done")
-    public ResponseEntity<OccurrenceActionResponse> skipAlreadyDone(
-            @PathVariable String groupId,
-            @PathVariable String occurrenceId,
-            @Valid @RequestBody(required = false) OccurrenceActionRequest body,
-            @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey,
-            @RequestHeader(name = "If-Match", required = false) String ifMatch,
-            OAuth2AuthenticationToken authentication,
-            HttpServletRequest request
-    ) {
-        OccurrenceActionRequest effectiveBody =
-                body == null ? new OccurrenceActionRequest(null) : body;
-        return executeAction(
-                request,
-                authentication,
-                idempotencyKey,
-                ifMatch,
-                effectiveBody,
-                () -> actionService.skipAlreadyDone(
-                        groupId,
-                        occurrenceId,
-                        authentication.getAuthorizedClientRegistrationId(),
-                        authentication.getPrincipal(),
-                        ExpectedVersion.parse(ifMatch).value(),
-                        effectiveBody.note(),
-                        Instant.now()
-                )
-        );
-    }
-
-    @PostMapping("/{occurrenceId}/decline")
-    public ResponseEntity<OccurrenceActionResponse> decline(
-            @PathVariable String groupId,
-            @PathVariable String occurrenceId,
-            @Valid @RequestBody(required = false) OccurrenceActionRequest body,
-            @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey,
-            @RequestHeader(name = "If-Match", required = false) String ifMatch,
-            OAuth2AuthenticationToken authentication,
-            HttpServletRequest request
-    ) {
-        OccurrenceActionRequest effectiveBody =
-                body == null ? new OccurrenceActionRequest(null) : body;
-        return executeAction(
-                request,
-                authentication,
-                idempotencyKey,
-                ifMatch,
-                effectiveBody,
-                () -> actionService.decline(
-                        groupId,
-                        occurrenceId,
-                        authentication.getAuthorizedClientRegistrationId(),
-                        authentication.getPrincipal(),
-                        ExpectedVersion.parse(ifMatch).value(),
-                        effectiveBody.note(),
-                        Instant.now()
-                )
-        );
-    }
-
     @GetMapping("/completed-history")
     public CompletedOccurrenceHistoryResponse completedHistory(
             @PathVariable String groupId,
