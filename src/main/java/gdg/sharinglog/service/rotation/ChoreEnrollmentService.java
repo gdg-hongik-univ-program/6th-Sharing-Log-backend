@@ -15,28 +15,18 @@ import gdg.sharinglog.repository.GroupMemberRepository;
 import gdg.sharinglog.repository.rotation.ChoreAssignmentAttemptRepository;
 import gdg.sharinglog.repository.rotation.ChoreEligibleMemberRepository;
 import gdg.sharinglog.repository.rotation.ChoreRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class ChoreEnrollmentService {
 
     private final GroupMemberRepository groupMemberRepository;
     private final ChoreRepository choreRepository;
     private final ChoreEligibleMemberRepository enrollmentRepository;
     private final ChoreAssignmentAttemptRepository assignmentRepository;
-
-    public ChoreEnrollmentService(
-            GroupMemberRepository groupMemberRepository,
-            ChoreRepository choreRepository,
-            ChoreEligibleMemberRepository enrollmentRepository,
-            ChoreAssignmentAttemptRepository assignmentRepository
-    ) {
-        this.groupMemberRepository = groupMemberRepository;
-        this.choreRepository = choreRepository;
-        this.enrollmentRepository = enrollmentRepository;
-        this.assignmentRepository = assignmentRepository;
-    }
 
     @Transactional
     public void initializeChore(

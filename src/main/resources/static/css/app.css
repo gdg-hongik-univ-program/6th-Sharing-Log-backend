@@ -50,7 +50,8 @@ h1 {
     line-height: 1.65;
 }
 
-.login-buttons {
+.login-buttons,
+.occurrence-grid {
     display: grid;
     gap: 12px;
 }
@@ -218,11 +219,6 @@ button:disabled {
     font-size: 14px;
 }
 
-.occurrence-grid {
-    display: grid;
-    gap: 12px;
-}
-
 .occurrence-card {
     padding: 16px;
     border: 1px solid #dadce0;
@@ -244,7 +240,8 @@ button:disabled {
     font-size: 13px;
 }
 
-.status-badge {
+.status-badge,
+.inactive-badge {
     padding: 4px 8px;
     border: 1px solid #dadce0;
     font-size: 11px;
@@ -291,24 +288,25 @@ button:disabled {
     border: 1px solid #dadce0;
 }
 
-.member-check-list {
+.member-check-list,
+.chore-management-list {
     display: grid;
     gap: 8px;
 }
 
 .member-check-list label,
 .rotation-dialog .choice-option {
+    display: grid;
+    grid-template-columns: auto 1fr;
     margin: 0;
+    border-radius: 4px;
     font-weight: 400;
 }
 
 .member-check-list label {
-    display: grid;
-    grid-template-columns: auto 1fr;
     align-items: center;
     gap: 8px;
     padding: 8px;
-    border-radius: 4px;
 }
 
 .member-check-list label:hover,
@@ -334,12 +332,9 @@ button:disabled {
 }
 
 .rotation-dialog .choice-option {
-    display: grid;
-    grid-template-columns: auto 1fr;
     align-items: start;
     gap: 10px;
     padding: 10px;
-    border-radius: 4px;
     cursor: pointer;
 }
 
@@ -380,13 +375,12 @@ button:disabled {
 }
 
 .rotation-dialog h3,
-.rotation-dialog h4 {
+.rotation-dialog h4,
+.workflow-card h3 {
     margin: 0;
 }
 
 .chore-management-list {
-    display: grid;
-    gap: 8px;
     margin-top: 12px;
 }
 
@@ -401,12 +395,9 @@ button:disabled {
     border-radius: 4px;
 }
 
-.workflow-card h3 {
-    margin: 0;
-}
-
 .workflow-card .occurrence-heading p,
-.workflow-meta {
+.workflow-meta,
+.chore-management-meta {
     margin: 5px 0 0;
     color: #5f6368;
     font-size: 12px;
@@ -433,19 +424,10 @@ button:disabled {
     gap: 8px;
 }
 
-.chore-management-meta {
-    margin: 5px 0 0;
-    color: #5f6368;
-    font-size: 12px;
-}
-
 .inactive-badge {
     flex: 0 0 auto;
-    padding: 4px 8px;
-    border: 1px solid #dadce0;
     color: #5f6368;
     background: #f6f8fb;
-    font-size: 11px;
 }
 
 @media (max-width: 600px) {

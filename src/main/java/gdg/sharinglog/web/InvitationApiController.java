@@ -3,6 +3,7 @@ package gdg.sharinglog.web;
 import gdg.sharinglog.service.invitation.InvitationAcceptanceService;
 import gdg.sharinglog.service.invitation.result.AcceptedInvitation;
 import gdg.sharinglog.service.invitation.result.InvitationPreview;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
@@ -14,15 +15,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RequestMapping("/api/invitations")
 @RestController
+@RequiredArgsConstructor
 public class InvitationApiController {
 
     private final InvitationAcceptanceService acceptanceService;
-
-    public InvitationApiController(
-            InvitationAcceptanceService acceptanceService
-    ) {
-        this.acceptanceService = acceptanceService;
-    }
 
     @GetMapping("/{code}")
     public ResponseEntity<InvitationPreview> previewInvitation(

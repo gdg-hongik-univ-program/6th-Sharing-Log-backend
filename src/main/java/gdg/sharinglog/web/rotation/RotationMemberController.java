@@ -17,6 +17,7 @@ import gdg.sharinglog.web.rotation.http.ExpectedVersion;
 import gdg.sharinglog.web.rotation.http.IdempotencyKey;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -30,24 +31,13 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/groups/{groupId}")
+@RequiredArgsConstructor
 public class RotationMemberController {
 
     private final MemberLeaveApplicationService leaveService;
     private final RotationMemberQueryService queryService;
     private final ChoreParticipationApplicationService participationService;
     private final IdempotentCommandExecutor idempotentExecutor;
-
-    public RotationMemberController(
-            MemberLeaveApplicationService leaveService,
-            RotationMemberQueryService queryService,
-            ChoreParticipationApplicationService participationService,
-            IdempotentCommandExecutor idempotentExecutor
-    ) {
-        this.leaveService = leaveService;
-        this.queryService = queryService;
-        this.participationService = participationService;
-        this.idempotentExecutor = idempotentExecutor;
-    }
 
     @GetMapping("/rotation-members")
     public RotationMemberListResponse activeMembers(

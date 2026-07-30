@@ -5,26 +5,18 @@ import gdg.sharinglog.repository.GroupMemberRepository;
 import gdg.sharinglog.service.rotation.access.RotationActorAccessService;
 import gdg.sharinglog.web.rotation.RotationViewMapper;
 import gdg.sharinglog.web.rotation.dto.RotationMemberListResponse;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class RotationMemberQueryService {
 
     private final RotationActorAccessService accessService;
     private final GroupMemberRepository memberRepository;
     private final RotationViewMapper viewMapper;
-
-    public RotationMemberQueryService(
-            RotationActorAccessService accessService,
-            GroupMemberRepository memberRepository,
-            RotationViewMapper viewMapper
-    ) {
-        this.accessService = accessService;
-        this.memberRepository = memberRepository;
-        this.viewMapper = viewMapper;
-    }
 
     @Transactional(readOnly = true)
     public RotationMemberListResponse findActiveMembers(

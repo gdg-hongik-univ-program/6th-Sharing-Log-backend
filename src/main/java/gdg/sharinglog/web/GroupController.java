@@ -6,6 +6,7 @@ import gdg.sharinglog.service.group.GroupService;
 import gdg.sharinglog.web.dto.CreateGroupRequest;
 import gdg.sharinglog.web.dto.GroupResponse;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -15,13 +16,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RequestMapping("/api/groups")
 @RestController
+@RequiredArgsConstructor
 public class GroupController {
 
     private final GroupService groupService;
-
-    public GroupController(GroupService groupService) {
-        this.groupService = groupService;
-    }
 
     @PostMapping
     public ResponseEntity<GroupResponse> createGroup(@Valid @RequestBody CreateGroupRequest request,

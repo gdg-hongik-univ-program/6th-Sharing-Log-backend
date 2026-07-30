@@ -28,11 +28,13 @@ import gdg.sharinglog.service.rotation.api.substitute.SubstituteRequestLifecycle
 import gdg.sharinglog.web.rotation.error.RotationConflictException;
 import gdg.sharinglog.web.rotation.error.RotationNotFoundException;
 import gdg.sharinglog.web.rotation.error.RotationProblemCode;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class ChoreParticipationApplicationService {
 
     private final RotationActorAccessService accessService;
@@ -42,24 +44,6 @@ public class ChoreParticipationApplicationService {
     private final ChoreEnrollmentService enrollmentService;
     private final RotationAssignmentService assignmentService;
     private final SubstituteRequestLifecycleService substituteRequestLifecycleService;
-
-    public ChoreParticipationApplicationService(
-            RotationActorAccessService accessService,
-            ChoreRepository choreRepository,
-            ChoreOccurrenceRepository occurrenceRepository,
-            OccurrenceEligibleMemberRepository eligibilityRepository,
-            ChoreEnrollmentService enrollmentService,
-            RotationAssignmentService assignmentService,
-            SubstituteRequestLifecycleService substituteRequestLifecycleService
-    ) {
-        this.accessService = accessService;
-        this.choreRepository = choreRepository;
-        this.occurrenceRepository = occurrenceRepository;
-        this.eligibilityRepository = eligibilityRepository;
-        this.enrollmentService = enrollmentService;
-        this.assignmentService = assignmentService;
-        this.substituteRequestLifecycleService = substituteRequestLifecycleService;
-    }
 
     @Transactional
     public UpdatedChoreParticipations update(

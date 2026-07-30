@@ -34,6 +34,9 @@
     const editWeeklyField = document.querySelector("#edit-weekly-day-field");
     const editBiweeklyField = document.querySelector("#edit-biweekly-anchor-field");
     const editChoreStatus = document.querySelector("#edit-chore-status");
+    const syncScheduleFields = syncSchedule.bind(null, frequencyInput, weeklyField, biweeklyField);
+    const syncEditScheduleFields =
+        syncSchedule.bind(null, editChoreFrequency, editWeeklyField, editBiweeklyField);
 
     const substituteDialog = document.querySelector("#substitute-requests-dialog");
     const substituteBox = document.querySelector("#substitute-request-box");
@@ -61,21 +64,14 @@
         createDialog.showModal();
         void loadEligibleMembers();
     });
-    document.querySelector("#close-create-chore")
-        .addEventListener("click", () => createDialog.close());
     openManageButton.addEventListener("click", () => void openManagement());
-    document.querySelector("#close-manage-rotation")
-        .addEventListener("click", () => manageDialog.close());
     document.querySelector("#open-substitute-requests")
         .addEventListener("click", () => void openSubstituteRequests());
-    document.querySelector("#close-substitute-requests")
-        .addEventListener("click", () => substituteDialog.close());
     document.querySelector("#open-completed-history")
         .addEventListener("click", () => void openCompletedHistory());
-    document.querySelector("#close-completed-history")
-        .addEventListener("click", () => completedHistoryDialog.close());
-    document.querySelector("#close-edit-chore")
-        .addEventListener("click", () => editChoreDialog.close());
+    document.querySelectorAll(".rotation-dialog .icon-button").forEach((button) =>
+        button.addEventListener("click", () => button.closest("dialog").close())
+    );
     manageMemberSelect.addEventListener("change", renderSelectedMemberManagement);
     removeMemberButton.addEventListener("click", () => void removeSelectedMember());
 
@@ -939,7 +935,7 @@
         const csrf = await requestJson("/api/auth/csrf");
         const headers = {
             Accept: "application/json",
-            "Idempotency-Key": crypto.randomUUID(),
+            "Idempotency-Key": newIdempotencyKey(),
             [csrf.headerName]: csrf.token
         };
         if (body !== undefined) {
@@ -986,14 +982,9 @@
         return data;
     }
 
-    function syncScheduleFields() {
-        weeklyField.hidden = frequencyInput.value !== "WEEKLY";
-        biweeklyField.hidden = frequencyInput.value !== "BIWEEKLY";
-    }
-
-    function syncEditScheduleFields() {
-        editWeeklyField.hidden = editChoreFrequency.value !== "WEEKLY";
-        editBiweeklyField.hidden = editChoreFrequency.value !== "BIWEEKLY";
+    function syncSchedule(input, weekly, biweekly) {
+        weekly.hidden = input.value !== "WEEKLY";
+        biweekly.hidden = input.value !== "BIWEEKLY";
     }
 
     function syncEligibilityField() {
@@ -1037,57 +1028,68 @@
         return version === undefined || version === null ? null : `"${version}"`;
     }
 
+    function newIdempotencyKey() {
+        const browserCrypto = globalThis.crypto;
+        if (browserCrypto && typeof browserCrypto.randomUUID === "function") {
+            return browserCrypto.randomUUID();
+        }
+        if (browserCrypto && typeof browserCrypto.getRandomValues === "function") {
+            const bytes = new Uint8Array(16);
+            browserCrypto.getRandomValues(bytes);
+            bytes[6] = (bytes[6] & 0x0f) | 0x40;
+            bytes[8] = (bytes[8] & 0x3f) | 0x80;
+            const hex = [...bytes].map((value) =>
+                value.toString(16).padStart(2, "0")
+            );
+            return [
+                hex.slice(0, 4).join(""),
+                hex.slice(4, 6).join(""),
+                hex.slice(6, 8).join(""),
+                hex.slice(8, 10).join(""),
+                hex.slice(10, 16).join("")
+            ].join("-");
+        }
+        return `fallback-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    }
+
+    const LABELS = {
+        status: {ASSIGNED: "배정됨", COMPLETED: "완료", SKIPPED: "생략", NEEDS_ATTENTION: "관리 필요"},
+        action: {
+            COMPLETE: "업무 완료", SKIP_ALREADY_DONE: "이미 처리됨", DECLINE: "이번 회차는 어려워요",
+            REQUEST_SUBSTITUTE: "대타 요청", RETRY_ASSIGNMENT: "자동 배정 다시 시도", UNDO_COMPLETE: "완료 취소"
+        },
+        requestStatus: {PENDING: "응답 대기", ACCEPTED: "수락됨", EXHAUSTED: "전원 거절", CANCELLED: "취소됨"},
+        recipientStatus: {PENDING: "대기", ACCEPTED: "수락", DECLINED: "거절", INELIGIBLE: "응답 종료"},
+        frequency: {DAILY: "매일", WEEKLY: "매주", BIWEEKLY: "격주"},
+        role: {OWNER: "소유자", MEMBER: "멤버"}
+    };
+
+    function label(labels, value, fallback = value) {
+        return labels[value] || fallback;
+    }
+
     function statusLabel(value) {
-        return {
-            ASSIGNED: "배정됨",
-            COMPLETED: "완료",
-            SKIPPED: "생략",
-            NEEDS_ATTENTION: "관리 필요"
-        }[value] || value;
+        return label(LABELS.status, value);
     }
 
     function actionLabel(value) {
-        return {
-            COMPLETE: "업무 완료",
-            SKIP_ALREADY_DONE: "이미 처리됨",
-            DECLINE: "이번 회차는 어려워요",
-            REQUEST_SUBSTITUTE: "대타 요청",
-            RETRY_ASSIGNMENT: "자동 배정 다시 시도",
-            UNDO_COMPLETE: "완료 취소"
-        }[value] || value;
+        return label(LABELS.action, value);
     }
 
     function substituteRequestStatusLabel(value) {
-        return {
-            PENDING: "응답 대기",
-            ACCEPTED: "수락됨",
-            EXHAUSTED: "전원 거절",
-            CANCELLED: "취소됨"
-        }[value] || value;
+        return label(LABELS.requestStatus, value);
     }
 
     function substituteRecipientStatusLabel(value) {
-        return {
-            PENDING: "대기",
-            ACCEPTED: "수락",
-            DECLINED: "거절",
-            INELIGIBLE: "응답 종료"
-        }[value] || value;
+        return label(LABELS.recipientStatus, value);
     }
 
     function frequencyLabel(value) {
-        return {
-            DAILY: "매일",
-            WEEKLY: "매주",
-            BIWEEKLY: "격주"
-        }[value] || value || "주기 미정";
+        return label(LABELS.frequency, value, value || "주기 미정");
     }
 
     function roleLabel(value) {
-        return {
-            OWNER: "소유자",
-            MEMBER: "멤버"
-        }[value] || value;
+        return label(LABELS.role, value);
     }
 
     function errorMessage(error) {

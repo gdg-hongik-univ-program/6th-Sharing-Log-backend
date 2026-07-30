@@ -112,8 +112,6 @@
         };
         const options = {
             method: "POST",
-            credentials: "same-origin",
-            cache: "no-store",
             headers
         };
 
@@ -125,20 +123,12 @@
         return requestJson(url, options);
     }
 
-    async function getJson(url) {
-        return requestJson(url, {
-            credentials: "same-origin",
-            cache: "no-store",
-            headers: {Accept: "application/json"}
-        });
-    }
-
     async function loadMembers(groupId) {
         loadMembersButton.disabled = true;
         memberListResult.textContent = "멤버 목록 조회 중...";
 
         try {
-            const group = await getJson(
+            const group = await requestJson(
                 `/api/groups/${encodeURIComponent(String(groupId))}/members`
             );
             renderMembers(group);
@@ -186,19 +176,20 @@
     }
 
     async function getCsrfToken() {
-        const csrf = await requestJson("/api/auth/csrf", {
-            credentials: "same-origin",
-            cache: "no-store",
-            headers: {Accept: "application/json"}
-        });
+        const csrf = await requestJson("/api/auth/csrf");
         if (!csrf.headerName || !csrf.token) {
             throw new Error("보안 토큰을 가져오지 못했습니다. 페이지를 새로고침해 주세요.");
         }
         return csrf;
     }
 
-    async function requestJson(url, options) {
-        const response = await fetch(url, options);
+    async function requestJson(url, options = {}) {
+        const response = await fetch(url, {
+            credentials: "same-origin",
+            cache: "no-store",
+            headers: {Accept: "application/json"},
+            ...options
+        });
         const contentType = response.headers.get("content-type") || "";
 
         if (response.redirected || !contentType.toLowerCase().includes("json")) {

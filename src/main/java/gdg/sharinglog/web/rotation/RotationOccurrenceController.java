@@ -19,6 +19,7 @@ import gdg.sharinglog.web.rotation.http.ExpectedVersion;
 import gdg.sharinglog.web.rotation.http.IdempotencyKey;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.validation.annotation.Validated;
@@ -34,21 +35,12 @@ import org.springframework.web.bind.annotation.RestController;
 @Validated
 @RestController
 @RequestMapping("/api/groups/{groupId}/occurrences")
+@RequiredArgsConstructor
 public class RotationOccurrenceController {
 
     private final OccurrenceQueryService queryService;
     private final OccurrenceActionApplicationService actionService;
     private final IdempotentCommandExecutor idempotentExecutor;
-
-    public RotationOccurrenceController(
-            OccurrenceQueryService queryService,
-            OccurrenceActionApplicationService actionService,
-            IdempotentCommandExecutor idempotentExecutor
-    ) {
-        this.queryService = queryService;
-        this.actionService = actionService;
-        this.idempotentExecutor = idempotentExecutor;
-    }
 
     @GetMapping
     public OccurrenceListResponse findActiveOn(

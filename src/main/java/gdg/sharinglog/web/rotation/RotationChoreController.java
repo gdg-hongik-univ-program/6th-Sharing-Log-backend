@@ -5,7 +5,6 @@ import java.util.List;
 
 import gdg.sharinglog.domain.rotation.ChoreFrequency;
 import gdg.sharinglog.service.rotation.api.chore.ChoreApplicationService;
-import gdg.sharinglog.service.rotation.api.chore.ChoreLifecycleApplicationService;
 import gdg.sharinglog.service.rotation.api.chore.CreateChoreCommand;
 import gdg.sharinglog.service.rotation.api.chore.UpdateChoreCommand;
 import gdg.sharinglog.service.rotation.api.idempotency.CommandResponse;
@@ -21,6 +20,7 @@ import gdg.sharinglog.web.rotation.http.ExpectedVersion;
 import gdg.sharinglog.web.rotation.http.IdempotencyKey;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.validation.annotation.Validated;
@@ -38,24 +38,12 @@ import org.springframework.web.bind.annotation.RestController;
 @Validated
 @RestController
 @RequestMapping("/api/groups/{groupId}/chores")
+@RequiredArgsConstructor
 public class RotationChoreController {
 
     private final ChoreApplicationService choreService;
-    private final ChoreLifecycleApplicationService lifecycleService;
     private final IdempotentCommandExecutor idempotentExecutor;
     private final RotationViewMapper viewMapper;
-
-    public RotationChoreController(
-            ChoreApplicationService choreService,
-            ChoreLifecycleApplicationService lifecycleService,
-            IdempotentCommandExecutor idempotentExecutor,
-            RotationViewMapper viewMapper
-    ) {
-        this.choreService = choreService;
-        this.lifecycleService = lifecycleService;
-        this.idempotentExecutor = idempotentExecutor;
-        this.viewMapper = viewMapper;
-    }
 
     @PostMapping
     public ResponseEntity<CreateChoreResponse> create(
@@ -178,7 +166,7 @@ public class RotationChoreController {
                 ifMatch,
                 Void.class,
                 () -> {
-                    long version = lifecycleService.deactivate(
+                    long version = choreService.deactivate(
                             groupId,
                             choreId,
                             authentication.getAuthorizedClientRegistrationId(),

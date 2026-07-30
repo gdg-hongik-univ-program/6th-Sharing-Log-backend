@@ -4,18 +4,16 @@ import gdg.sharinglog.config.oauth.OAuth2UserIdentity;
 import gdg.sharinglog.domain.User;
 import gdg.sharinglog.repository.UserRepository;
 import gdg.sharinglog.service.user.exception.AuthenticatedUserNotFoundException;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class AuthenticatedUserService {
 
     private final UserRepository userRepository;
-
-    public AuthenticatedUserService(UserRepository userRepository) {
-        this.userRepository = userRepository;
-    }
 
     @Transactional(readOnly = true)
     public User requireUser(String registrationId, OAuth2User oAuth2User) {

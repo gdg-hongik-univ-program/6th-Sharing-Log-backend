@@ -1,5 +1,7 @@
 package gdg.sharinglog.service.rotation.api.substitute;
 
+import static gdg.sharinglog.domain.rotation.AssignmentEndReason.SAME_OCCURRENCE_EXCLUSIONS;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -30,18 +32,14 @@ import gdg.sharinglog.web.rotation.error.RotationConflictException;
 import gdg.sharinglog.web.rotation.error.RotationForbiddenException;
 import gdg.sharinglog.web.rotation.error.RotationNotFoundException;
 import gdg.sharinglog.web.rotation.error.RotationProblemCode;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class SubstituteRequestApplicationService {
-
-    private static final List<AssignmentEndReason> SAME_OCCURRENCE_EXCLUSIONS =
-            List.of(
-                    AssignmentEndReason.DECLINED_BY_ASSIGNEE,
-                    AssignmentEndReason.SUBSTITUTE_ACCEPTED
-            );
 
     private final RotationActorAccessService accessService;
     private final ChoreOccurrenceRepository occurrenceRepository;
@@ -51,26 +49,6 @@ public class SubstituteRequestApplicationService {
     private final SubstituteRequestRecipientRepository recipientRepository;
     private final DirectAssignmentService directAssignmentService;
     private final RotationViewMapper viewMapper;
-
-    public SubstituteRequestApplicationService(
-            RotationActorAccessService accessService,
-            ChoreOccurrenceRepository occurrenceRepository,
-            ChoreAssignmentAttemptRepository assignmentRepository,
-            OccurrenceEligibleMemberRepository eligibilityRepository,
-            SubstituteRequestRepository requestRepository,
-            SubstituteRequestRecipientRepository recipientRepository,
-            DirectAssignmentService directAssignmentService,
-            RotationViewMapper viewMapper
-    ) {
-        this.accessService = accessService;
-        this.occurrenceRepository = occurrenceRepository;
-        this.assignmentRepository = assignmentRepository;
-        this.eligibilityRepository = eligibilityRepository;
-        this.requestRepository = requestRepository;
-        this.recipientRepository = recipientRepository;
-        this.directAssignmentService = directAssignmentService;
-        this.viewMapper = viewMapper;
-    }
 
     @Transactional
     public SubstituteRequestResponse create(
@@ -85,7 +63,7 @@ public class SubstituteRequestApplicationService {
         RotationActor actor =
                 accessService.requireActiveMemberForUpdate(groupPublicId, registrationId, principal);
         ChoreOccurrence occurrence = lockedOccurrence(groupPublicId, occurrencePublicId);
-        requireVersion(occurrence, expectedOccurrenceVersion);
+        requireVersion(occurrence.getPublicId(), expectedOccurrenceVersion, occurrence.getVersion());
         requireAssignedToActor(occurrence, actor);
         if (requestRepository
                 .findByOccurrence_IdAndActiveMarker(occurrence.getId(), 1)
@@ -209,19 +187,9 @@ public class SubstituteRequestApplicationService {
                 accessService.requireActiveMemberForUpdate(groupPublicId, registrationId, principal);
         ChoreOccurrence occurrence = lockRequestOccurrence(groupPublicId, requestPublicId);
         SubstituteRequest request = lockedRequest(groupPublicId, requestPublicId);
-        requireVersion(request, expectedRequestVersion);
+        requireVersion(request.getPublicId(), expectedRequestVersion, request.getVersion());
         requireLiveRequest(request, occurrence);
-        SubstituteRequestRecipient recipient = recipientRepository
-                .findForUpdate(request.getId(), actor.membership().getId())
-                .orElseThrow(() -> notRecipient(requestPublicId));
-        if (!recipient.getResponseStatus().isPending()
-                || !recipient.belongsToCurrentActivation()) {
-            throw conflict(
-                    RotationProblemCode.INVALID_SUBSTITUTE_REQUEST_STATE,
-                    "This member has already responded or is no longer eligible.",
-                    requestPublicId
-            );
-        }
+        SubstituteRequestRecipient recipient = requirePendingRecipient(request, actor);
 
         Instant effectiveAcceptedAt =
                 Objects.requireNonNull(acceptedAt, "대타 수락 시각은 필수입니다.");
@@ -264,19 +232,9 @@ public class SubstituteRequestApplicationService {
                 accessService.requireActiveMemberForUpdate(groupPublicId, registrationId, principal);
         ChoreOccurrence occurrence = lockRequestOccurrence(groupPublicId, requestPublicId);
         SubstituteRequest request = lockedRequest(groupPublicId, requestPublicId);
-        requireVersion(request, expectedRequestVersion);
+        requireVersion(request.getPublicId(), expectedRequestVersion, request.getVersion());
         requireLiveRequest(request, occurrence);
-        SubstituteRequestRecipient recipient = recipientRepository
-                .findForUpdate(request.getId(), actor.membership().getId())
-                .orElseThrow(() -> notRecipient(requestPublicId));
-        if (!recipient.getResponseStatus().isPending()
-                || !recipient.belongsToCurrentActivation()) {
-            throw conflict(
-                    RotationProblemCode.INVALID_SUBSTITUTE_REQUEST_STATE,
-                    "This member has already responded or is no longer eligible.",
-                    requestPublicId
-            );
-        }
+        SubstituteRequestRecipient recipient = requirePendingRecipient(request, actor);
 
         Instant effectiveDeclinedAt =
                 Objects.requireNonNull(declinedAt, "대타 거절 시각은 필수입니다.");
@@ -364,23 +322,13 @@ public class SubstituteRequestApplicationService {
         }
     }
 
-    private void requireVersion(ChoreOccurrence occurrence, long expectedVersion) {
-        if (occurrence.getVersion() != expectedVersion) {
-            throw versionConflict(
-                    occurrence.getPublicId(),
-                    expectedVersion,
-                    occurrence.getVersion()
-            );
-        }
-    }
-
-    private void requireVersion(SubstituteRequest request, long expectedVersion) {
-        if (request.getVersion() != expectedVersion) {
-            throw versionConflict(
-                    request.getPublicId(),
-                    expectedVersion,
-                    request.getVersion()
-            );
+    private void requireVersion(
+            String resourceId,
+            long expectedVersion,
+            long currentVersion
+    ) {
+        if (currentVersion != expectedVersion) {
+            throw versionConflict(resourceId, expectedVersion, currentVersion);
         }
     }
 
@@ -412,12 +360,26 @@ public class SubstituteRequestApplicationService {
         );
     }
 
-    private RotationForbiddenException notRecipient(String resourceId) {
-        return new RotationForbiddenException(
-                RotationProblemCode.NOT_SUBSTITUTE_RECIPIENT,
-                "Only a recipient of this substitute request can respond.",
-                Map.of("resourceId", resourceId)
-        );
+    private SubstituteRequestRecipient requirePendingRecipient(
+            SubstituteRequest request,
+            RotationActor actor
+    ) {
+        SubstituteRequestRecipient recipient = recipientRepository
+                .findForUpdate(request.getId(), actor.membership().getId())
+                .orElseThrow(() -> new RotationForbiddenException(
+                        RotationProblemCode.NOT_SUBSTITUTE_RECIPIENT,
+                        "Only a recipient of this substitute request can respond.",
+                        Map.of("resourceId", request.getPublicId())
+                ));
+        if (!recipient.getResponseStatus().isPending()
+                || !recipient.belongsToCurrentActivation()) {
+            throw conflict(
+                    RotationProblemCode.INVALID_SUBSTITUTE_REQUEST_STATE,
+                    "This member has already responded or is no longer eligible.",
+                    request.getPublicId()
+            );
+        }
+        return recipient;
     }
 
     private boolean visibleInBox(
@@ -427,18 +389,15 @@ public class SubstituteRequestApplicationService {
     ) {
         boolean requester =
                 request.requester().getId().equals(actor.membership().getId());
-        List<SubstituteRequestRecipient> recipients =
-                recipientRepository.findAllByRequest_IdOrderById(request.getId());
-        boolean recipient = recipients.stream()
-                .anyMatch(item -> item.getMember().getId().equals(actor.membership().getId()));
+        var recipient = recipientRepository.findAllByRequest_IdOrderById(request.getId())
+                .stream()
+                .filter(item -> item.getMember().getId().equals(actor.membership().getId()))
+                .findFirst();
         return switch (box) {
-            case INBOX -> recipient && recipients.stream()
-                    .filter(item -> item.getMember().getId()
-                            .equals(actor.membership().getId()))
-                    .anyMatch(item -> item.getResponseStatus().isPending())
-                    && request.getStatus().isPending();
+            case INBOX -> request.getStatus().isPending()
+                    && recipient.filter(item -> item.getResponseStatus().isPending()).isPresent();
             case OUTBOX -> requester;
-            case ALL -> actor.isOwner() || requester || recipient;
+            case ALL -> actor.isOwner() || requester || recipient.isPresent();
         };
     }
 

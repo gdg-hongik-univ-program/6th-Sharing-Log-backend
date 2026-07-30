@@ -18,11 +18,13 @@ import gdg.sharinglog.service.invitation.result.AcceptedInvitation;
 import gdg.sharinglog.service.invitation.result.InvitationPreview;
 import gdg.sharinglog.service.rotation.ChoreEnrollmentService;
 import gdg.sharinglog.service.user.AuthenticatedUserService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class InvitationAcceptanceService {
 
     private static final Pattern INVITATION_CODE_PATTERN = Pattern.compile("[A-Za-z0-9_-]{22}");
@@ -33,20 +35,6 @@ public class InvitationAcceptanceService {
     private final InvitationCodeHasher codeHasher;
     private final AuthenticatedUserService authenticatedUserService;
     private final ChoreEnrollmentService choreEnrollmentService;
-
-    public InvitationAcceptanceService(GroupInvitationRepository invitationRepository,
-                                       GroupMemberRepository groupMemberRepository,
-                                       SharingGroupRepository sharingGroupRepository,
-                                       InvitationCodeHasher codeHasher,
-                                       AuthenticatedUserService authenticatedUserService,
-                                       ChoreEnrollmentService choreEnrollmentService) {
-        this.invitationRepository = invitationRepository;
-        this.groupMemberRepository = groupMemberRepository;
-        this.sharingGroupRepository = sharingGroupRepository;
-        this.codeHasher = codeHasher;
-        this.authenticatedUserService = authenticatedUserService;
-        this.choreEnrollmentService = choreEnrollmentService;
-    }
 
     @Transactional(readOnly = true)
     public InvitationPreview preview(String rawCode, String registrationId, OAuth2User oAuth2User) {
