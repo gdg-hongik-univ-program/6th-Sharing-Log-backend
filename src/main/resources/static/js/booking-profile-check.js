@@ -8,7 +8,17 @@
     const spaceResult = document.querySelector("#space-result");
     const reservationResult = document.querySelector("#reservation-result");
     const reservationActionResult = document.querySelector("#reservation-action-result");
+    const embeddedDialog = document.querySelector("#booking-profile-dialog");
+    const openEmbeddedDialogButton = document.querySelector("#open-booking-profile");
+    const closeEmbeddedDialogButton = document.querySelector("#close-booking-profile");
     let csrfPromise;
+
+    if (embeddedDialog && openEmbeddedDialogButton) {
+        openEmbeddedDialogButton.addEventListener("click", () => embeddedDialog.showModal());
+    }
+    if (embeddedDialog && closeEmbeddedDialogButton) {
+        closeEmbeddedDialogButton.addEventListener("click", () => embeddedDialog.close());
+    }
 
     document.querySelector("#load-profile-button").addEventListener("click", () => {
         void loadProfile();
