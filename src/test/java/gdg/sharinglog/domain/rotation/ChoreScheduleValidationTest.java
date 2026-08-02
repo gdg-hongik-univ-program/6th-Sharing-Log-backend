@@ -1,8 +1,10 @@
 package gdg.sharinglog.domain.rotation;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -99,7 +101,7 @@ class ChoreScheduleValidationTest {
         );
 
         chore.rename("  공용 욕실 청소  ");
-        chore.reschedule(
+        boolean changed = chore.reschedule(
                 ChoreFrequency.WEEKLY,
                 LocalTime.of(19, 30),
                 DayOfWeek.SATURDAY,
@@ -111,6 +113,15 @@ class ChoreScheduleValidationTest {
         assertEquals(LocalTime.of(19, 30), chore.getDueTime());
         assertEquals(DayOfWeek.SATURDAY, chore.getWeeklyDueDay());
         assertNull(chore.getBiweeklyAnchorDate());
+        assertTrue(changed);
+        assertEquals(1L, chore.getScheduleRevision());
+        assertFalse(chore.reschedule(
+                ChoreFrequency.WEEKLY,
+                LocalTime.of(19, 30),
+                DayOfWeek.SATURDAY,
+                null
+        ));
+        assertEquals(1L, chore.getScheduleRevision());
     }
 
     private User user(String providerUserId) {

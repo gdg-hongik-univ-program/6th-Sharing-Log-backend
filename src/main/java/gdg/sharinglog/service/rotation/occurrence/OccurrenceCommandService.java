@@ -1,4 +1,4 @@
-package gdg.sharinglog.service.rotation;
+package gdg.sharinglog.service.rotation.occurrence;
 
 import static gdg.sharinglog.domain.rotation.AssignmentEndReason.SAME_OCCURRENCE_EXCLUSIONS;
 
@@ -19,7 +19,13 @@ import gdg.sharinglog.repository.SharingGroupRepository;
 import gdg.sharinglog.repository.rotation.ChoreAssignmentAttemptRepository;
 import gdg.sharinglog.repository.rotation.ChoreOccurrenceRepository;
 import gdg.sharinglog.repository.rotation.OccurrenceEligibleMemberRepository;
-import gdg.sharinglog.service.rotation.api.substitute.SubstituteRequestLifecycleService;
+import gdg.sharinglog.service.rotation.assignment.DirectAssignmentService;
+import gdg.sharinglog.service.rotation.assignment.RotationAssignmentService;
+import gdg.sharinglog.service.rotation.exception.LastOwnerCannotLeaveException;
+import gdg.sharinglog.service.rotation.exception.MemberNotFoundException;
+import gdg.sharinglog.service.rotation.exception.OccurrenceCommandConflictException;
+import gdg.sharinglog.service.rotation.exception.OccurrenceNotFoundException;
+import gdg.sharinglog.service.rotation.substitute.SubstituteRequestLifecycleService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

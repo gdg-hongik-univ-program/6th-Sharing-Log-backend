@@ -93,6 +93,9 @@ public class Chore {
     @Column(name = "eligibility_revision", nullable = false)
     private long eligibilityRevision;
 
+    @Column(name = "schedule_revision", nullable = false)
+    private long scheduleRevision;
+
     @Version
     @Column(name = "version", nullable = false)
     private long version;
@@ -120,6 +123,7 @@ public class Chore {
         this.publicId = UUID.randomUUID().toString();
         this.active = true;
         this.eligibilityRevision = 0L;
+        this.scheduleRevision = 0L;
         validateSchedule();
     }
 
@@ -179,7 +183,7 @@ public class Chore {
         this.name = normalizeName(name);
     }
 
-    public void reschedule(
+    public boolean reschedule(
             ChoreFrequency frequency,
             LocalTime dueTime,
             DayOfWeek weeklyDueDay,
@@ -195,10 +199,18 @@ public class Chore {
                 weeklyDueDay,
                 biweeklyAnchorDate
         );
+        if (this.frequency == requiredFrequency
+                && this.dueTime.equals(requiredDueTime)
+                && Objects.equals(this.weeklyDueDay, weeklyDueDay)
+                && Objects.equals(this.biweeklyAnchorDate, biweeklyAnchorDate)) {
+            return false;
+        }
         this.frequency = requiredFrequency;
         this.dueTime = requiredDueTime;
         this.weeklyDueDay = weeklyDueDay;
         this.biweeklyAnchorDate = biweeklyAnchorDate;
+        this.scheduleRevision = Math.incrementExact(this.scheduleRevision);
+        return true;
     }
 
     public void recordEnrollmentChange() {

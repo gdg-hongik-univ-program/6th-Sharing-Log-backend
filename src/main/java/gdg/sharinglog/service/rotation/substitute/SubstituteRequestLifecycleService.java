@@ -1,4 +1,4 @@
-package gdg.sharinglog.service.rotation.api.substitute;
+package gdg.sharinglog.service.rotation.substitute;
 
 import java.time.Instant;
 

@@ -1,4 +1,4 @@
-package gdg.sharinglog.service.rotation;
+package gdg.sharinglog.service.rotation.assignment;
 
 import java.util.List;
 import java.util.stream.Collectors;

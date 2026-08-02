@@ -22,7 +22,7 @@ import gdg.sharinglog.repository.rotation.ChoreOccurrenceRepository;
 import gdg.sharinglog.repository.rotation.OccurrenceEligibleMemberRepository;
 import gdg.sharinglog.repository.rotation.SubstituteRequestRecipientRepository;
 import gdg.sharinglog.repository.rotation.SubstituteRequestRepository;
-import gdg.sharinglog.service.rotation.DirectAssignmentService;
+import gdg.sharinglog.service.rotation.assignment.DirectAssignmentService;
 import gdg.sharinglog.service.rotation.access.RotationActor;
 import gdg.sharinglog.service.rotation.access.RotationActorAccessService;
 import gdg.sharinglog.web.rotation.RotationViewMapper;

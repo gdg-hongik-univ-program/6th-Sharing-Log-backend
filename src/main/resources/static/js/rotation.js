@@ -43,6 +43,16 @@
     const substituteList = document.querySelector("#substitute-request-list");
     const substituteStatus = document.querySelector("#substitute-request-status");
 
+    const notificationButton = document.querySelector("#open-notifications");
+    const notificationCount = document.querySelector("#notification-count");
+    const notificationDialog = document.querySelector("#notifications-dialog");
+    const notificationStatus = document.querySelector("#notification-status");
+    const notificationDueSoonCount = document.querySelector("#notification-due-soon-count");
+    const notificationSubstituteCount = document.querySelector("#notification-substitute-count");
+    const notificationTotalCount = document.querySelector("#notification-total-count");
+    const notificationDueSoonList = document.querySelector("#notification-due-soon-list");
+    const notificationSubstituteList = document.querySelector("#notification-substitute-list");
+
     const completedHistoryDialog = document.querySelector("#completed-history-dialog");
     const completedHistoryList = document.querySelector("#completed-history-list");
     const completedHistoryStatus = document.querySelector("#completed-history-status");
@@ -67,6 +77,9 @@
     openManageButton.addEventListener("click", () => void openManagement());
     document.querySelector("#open-substitute-requests")
         .addEventListener("click", () => void openSubstituteRequests());
+    notificationButton.addEventListener("click", () => void openNotifications());
+    document.querySelector("#refresh-notifications")
+        .addEventListener("click", () => void loadNotifications());
     document.querySelector("#open-completed-history")
         .addEventListener("click", () => void openCompletedHistory());
     document.querySelectorAll(".rotation-dialog .icon-button").forEach((button) =>
@@ -80,8 +93,7 @@
     eligibilityMode.addEventListener("change", syncEligibilityField);
     substituteBox.addEventListener("change", () => void loadSubstituteRequests());
     tabs.forEach((tab) => tab.addEventListener("click", () => {
-        frequency = tab.dataset.frequency;
-        tabs.forEach((item) => item.classList.toggle("is-active", item === tab));
+        activateFrequencyTab(tab.dataset.frequency);
         void loadOccurrences();
     }));
     createForm.addEventListener("submit", createChore);
@@ -94,6 +106,7 @@
     syncEligibilityField();
     void loadOccurrences();
     void loadManagementCapabilities();
+    void loadNotificationSummary();
 
     async function loadOccurrences() {
         status.textContent = "업무를 불러오는 중...";
@@ -123,7 +136,8 @@
             const name = document.createElement("h2");
             name.textContent = item.choreName;
             const period = document.createElement("p");
-            period.textContent = `${item.periodStart} — ${item.periodEndExclusive}`;
+            period.textContent = `${frequencyLabel(item.frequency)} · `
+                + `${item.periodStart} — ${item.periodEndExclusive}`;
             title.append(name, period);
             const badge = document.createElement("span");
             badge.className = "status-badge";
@@ -189,10 +203,8 @@
                 );
                 status.textContent = "대타 요청을 보냈습니다.";
                 substituteBox.value = "OUTBOX";
-                await Promise.all([
-                    loadOccurrences(),
-                    loadSubstituteRequests()
-                ]);
+                await loadOccurrences();
+                await openSubstituteRequests();
             } catch (error) {
                 status.textContent = errorMessage(error);
                 button.disabled = false;
@@ -424,7 +436,7 @@
             const name = document.createElement("strong");
             name.textContent = chore.name;
             const schedule = document.createElement("small");
-            schedule.textContent = frequencyLabel(chore.schedule?.frequency);
+            schedule.textContent = scheduleDescription(chore.schedule);
             copy.append(name, schedule);
             label.append(checkbox, copy);
             return label;
@@ -446,7 +458,7 @@
             name.textContent = chore.name;
             const meta = document.createElement("p");
             meta.className = "chore-management-meta";
-            meta.textContent = `${frequencyLabel(chore.schedule?.frequency)} · `
+            meta.textContent = `${scheduleDescription(chore.schedule)} · `
                 + `${chore.active === false ? "비활성" : "활성"}`;
             copy.append(name, meta);
             row.append(copy);
@@ -638,7 +650,7 @@
     function openEditChore(chore) {
         editingChore = chore;
         editChoreStatus.textContent =
-            "일정 변경은 이미 생성된 회차가 아니라 다음 회차부터 반영됩니다.";
+            "일정 변경은 현재 진행 중인 회차와 다음 회차부터 바로 반영됩니다.";
         document.querySelector("#edit-chore-name").value = chore.name;
         editChoreFrequency.value = chore.schedule.frequency;
         document.querySelector("#edit-chore-due-time").value =
@@ -685,6 +697,7 @@
             const selectedMembershipId = manageMemberSelect.value;
             editChoreDialog.close();
             editingChore = null;
+            activateFrequencyTab(selectedFrequency);
             await Promise.all([
                 loadOccurrences(),
                 loadManagementData(selectedMembershipId)
@@ -693,6 +706,138 @@
         } catch (error) {
             editChoreStatus.textContent = errorMessage(error);
         }
+    }
+
+    async function loadNotificationSummary() {
+        try {
+            const summary = await requestJson(`${groupPath}/notifications/summary`);
+            renderNotificationSummary(summary);
+        } catch (error) {
+            notificationCount.textContent = "!";
+            notificationCount.setAttribute("aria-label", "알림 요약 조회 실패");
+            notificationButton.title = errorMessage(error);
+        }
+    }
+
+    function renderNotificationSummary(summary) {
+        const dueSoonCount = Number(summary.dueSoonCount) || 0;
+        const substituteCount = Number(summary.pendingSubstituteRequestCount) || 0;
+        const totalCount = Number(summary.unreadCount) || 0;
+
+        notificationDueSoonCount.textContent = String(dueSoonCount);
+        notificationSubstituteCount.textContent = String(substituteCount);
+        notificationTotalCount.textContent = String(totalCount);
+        notificationCount.textContent = totalCount > 99 ? "99+" : String(totalCount);
+        notificationCount.setAttribute("aria-label", `알림 대상 ${totalCount}건`);
+        notificationButton.title = `마감 임박 ${dueSoonCount}건, 받은 대타 요청 ${substituteCount}건`;
+    }
+
+    async function openNotifications() {
+        notificationStatus.textContent = "";
+        notificationDialog.showModal();
+        await loadNotifications();
+    }
+
+    async function loadNotifications() {
+        notificationStatus.textContent = "알림 API 3개를 확인하는 중...";
+        notificationDueSoonList.replaceChildren();
+        notificationSubstituteList.replaceChildren();
+        try {
+            const [summary, dueSoonResponse, substituteResponse] = await Promise.all([
+                requestJson(`${groupPath}/notifications/summary`),
+                requestJson(`${groupPath}/occurrences/due-soon`),
+                requestJson(`${groupPath}/substitute-requests?box=INBOX&status=PENDING`)
+            ]);
+            const dueSoonItems = Array.isArray(dueSoonResponse.items)
+                ? dueSoonResponse.items
+                : [];
+            const substituteItems = Array.isArray(substituteResponse.items)
+                ? substituteResponse.items
+                : [];
+
+            renderNotificationSummary(summary);
+            renderDueSoonNotifications(dueSoonItems);
+            renderPendingSubstituteNotifications(substituteItems);
+            notificationStatus.textContent =
+                `API 응답 확인 완료 · 마감 임박 ${dueSoonItems.length}건 · 대타 요청 ${substituteItems.length}건`;
+        } catch (error) {
+            notificationStatus.textContent = errorMessage(error);
+        }
+    }
+
+    function renderDueSoonNotifications(items) {
+        if (!items.length) {
+            renderNotificationEmpty(notificationDueSoonList, "마감 임박 업무가 없습니다.");
+            return;
+        }
+
+        const cards = items.map((item) => {
+            const card = document.createElement("article");
+            card.className = "workflow-card";
+            const heading = document.createElement("div");
+            heading.className = "occurrence-heading";
+            const title = document.createElement("div");
+            const name = document.createElement("h3");
+            name.textContent = item.choreName;
+            const period = document.createElement("p");
+            period.textContent = `${item.periodStart} ~ ${item.periodEndExclusive}`;
+            title.append(name, period);
+            const badge = document.createElement("span");
+            badge.className = "status-badge";
+            badge.textContent = statusLabel(item.status);
+            heading.append(title, badge);
+
+            const assignee = document.createElement("p");
+            assignee.className = "workflow-meta";
+            assignee.textContent = `담당 · ${item.currentAssignee?.displayName || "담당자 없음"}`;
+            const due = document.createElement("p");
+            due.className = "workflow-meta";
+            due.textContent = `마감 · ${new Date(item.dueAt).toLocaleString("ko-KR")}`;
+            card.append(heading, assignee, due);
+            return card;
+        });
+        notificationDueSoonList.replaceChildren(...cards);
+    }
+
+    function renderPendingSubstituteNotifications(items) {
+        if (!items.length) {
+            renderNotificationEmpty(notificationSubstituteList, "받은 대타 요청이 없습니다.");
+            return;
+        }
+
+        const cards = items.map((item) => {
+            const card = document.createElement("article");
+            card.className = "workflow-card";
+            const heading = document.createElement("div");
+            heading.className = "occurrence-heading";
+            const title = document.createElement("div");
+            const name = document.createElement("h3");
+            name.textContent = item.choreName;
+            const requester = document.createElement("p");
+            requester.textContent = `요청자 · ${item.requester?.displayName || "알 수 없음"}`;
+            title.append(name, requester);
+            const badge = document.createElement("span");
+            badge.className = "status-badge";
+            badge.textContent = substituteRequestStatusLabel(item.status);
+            heading.append(title, badge);
+
+            const reason = document.createElement("p");
+            reason.className = "workflow-reason";
+            reason.textContent = item.reason || "사유 없음";
+            const due = document.createElement("p");
+            due.className = "workflow-meta";
+            due.textContent = `마감 · ${new Date(item.dueAt).toLocaleString("ko-KR")}`;
+            card.append(heading, reason, due);
+            return card;
+        });
+        notificationSubstituteList.replaceChildren(...cards);
+    }
+
+    function renderNotificationEmpty(target, message) {
+        const empty = document.createElement("p");
+        empty.className = "notification-empty";
+        empty.textContent = message;
+        target.replaceChildren(empty);
     }
 
     async function openSubstituteRequests() {
@@ -1022,6 +1167,14 @@
         return date.toISOString().slice(0, 10);
     }
 
+    function activateFrequencyTab(nextFrequency) {
+        frequency = nextFrequency;
+        tabs.forEach((tab) => tab.classList.toggle(
+            "is-active",
+            tab.dataset.frequency === nextFrequency
+        ));
+    }
+
     function strongEtag(version) {
         return version === undefined || version === null ? null : `"${version}"`;
     }
@@ -1059,6 +1212,10 @@
         requestStatus: {PENDING: "응답 대기", ACCEPTED: "수락됨", EXHAUSTED: "전원 거절", CANCELLED: "취소됨"},
         recipientStatus: {PENDING: "대기", ACCEPTED: "수락", DECLINED: "거절", INELIGIBLE: "응답 종료"},
         frequency: {DAILY: "매일", WEEKLY: "매주", BIWEEKLY: "격주"},
+        weekday: {
+            MONDAY: "월요일", TUESDAY: "화요일", WEDNESDAY: "수요일",
+            THURSDAY: "목요일", FRIDAY: "금요일", SATURDAY: "토요일", SUNDAY: "일요일"
+        },
         role: {OWNER: "소유자", MEMBER: "멤버"}
     };
 
@@ -1084,6 +1241,22 @@
 
     function frequencyLabel(value) {
         return label(LABELS.frequency, value, value || "주기 미정");
+    }
+
+    function scheduleDescription(schedule) {
+        const frequencyValue = schedule?.frequency;
+        const dueTime = (schedule?.dueTime || "").slice(0, 5) || "시간 미정";
+        if (frequencyValue === "WEEKLY") {
+            return `${frequencyLabel(frequencyValue)} · `
+                + `${label(LABELS.weekday, schedule.weeklyDueDay, "요일 미정")} `
+                + `${dueTime} 마감`;
+        }
+        if (frequencyValue === "BIWEEKLY") {
+            return `${frequencyLabel(frequencyValue)} · `
+                + `${schedule.biweeklyAnchorDate || "시작일 미정"} 시작 · `
+                + `${dueTime} 마감`;
+        }
+        return `${frequencyLabel(frequencyValue)} · ${dueTime} 마감`;
     }
 
     function roleLabel(value) {
