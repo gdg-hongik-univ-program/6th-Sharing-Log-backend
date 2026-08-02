@@ -1,4 +1,4 @@
-package gdg.sharinglog.service.rotation;
+package gdg.sharinglog.service.rotation.occurrence;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 

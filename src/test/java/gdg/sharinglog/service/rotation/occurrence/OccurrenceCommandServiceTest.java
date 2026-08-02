@@ -1,4 +1,4 @@
-package gdg.sharinglog.service.rotation;
+package gdg.sharinglog.service.rotation.occurrence;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -30,6 +30,9 @@ import gdg.sharinglog.repository.rotation.ChoreAssignmentAttemptRepository;
 import gdg.sharinglog.repository.rotation.ChoreEligibleMemberRepository;
 import gdg.sharinglog.repository.rotation.ChoreRepository;
 import gdg.sharinglog.repository.rotation.RotationDecisionLogRepository;
+import gdg.sharinglog.service.rotation.enrollment.ChoreEnrollmentService;
+import gdg.sharinglog.service.rotation.exception.LastOwnerCannotLeaveException;
+import gdg.sharinglog.service.rotation.exception.OccurrenceCommandConflictException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

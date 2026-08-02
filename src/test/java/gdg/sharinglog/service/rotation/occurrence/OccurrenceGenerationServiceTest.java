@@ -1,4 +1,4 @@
-package gdg.sharinglog.service.rotation;
+package gdg.sharinglog.service.rotation.occurrence;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -203,7 +203,7 @@ class OccurrenceGenerationServiceTest {
     }
 
     @Test
-    void scheduleChangeWaitsForTheNextNonOverlappingPeriod() {
+    void scheduleChangeMovesActiveOccurrenceAndKeepsAssignmentAndStatus() {
         Context context = context("schedule-change");
         Chore chore = choreRepository.save(Chore.daily(
                 context.group(),
@@ -217,6 +217,7 @@ class OccurrenceGenerationServiceTest {
                 chore.getId(),
                 Instant.parse("2026-07-23T03:00:00Z")
         );
+        Long assigneeId = daily.currentAssignee().orElseThrow().getId();
 
         chore.reschedule(
                 ChoreFrequency.WEEKLY,
@@ -226,19 +227,74 @@ class OccurrenceGenerationServiceTest {
         );
         choreRepository.saveAndFlush(chore);
 
-        ChoreOccurrence overlapping = generationService.ensureCurrentOccurrence(
+        ChoreOccurrence rescheduled = generationService.rescheduleActiveOccurrence(
+                chore,
+                Instant.parse("2026-07-23T04:00:00Z")
+        ).orElseThrow();
+        ChoreOccurrence ensured = generationService.ensureCurrentOccurrence(
                 chore.getId(),
                 Instant.parse("2026-07-23T04:00:00Z")
         );
-        ChoreOccurrence next = generationService.ensureCurrentOccurrence(
+
+        assertSame(daily, rescheduled);
+        assertSame(daily, ensured);
+        assertEquals(1, occurrenceRepository.count());
+        assertEquals(1L, chore.getScheduleRevision());
+        assertEquals(1L, daily.getScheduleRevisionSnapshot());
+        assertEquals(ChoreFrequency.WEEKLY, daily.getFrequencySnapshot());
+        assertEquals(LocalDate.of(2026, 7, 20), daily.getPeriodStart());
+        assertEquals(LocalDate.of(2026, 7, 27), daily.getPeriodEndExclusive());
+        assertEquals(Instant.parse("2026-07-26T10:00:00Z"), daily.getDueAt());
+        assertEquals(OccurrenceStatus.ASSIGNED, daily.getStatus());
+        assertEquals(assigneeId, daily.currentAssignee().orElseThrow().getId());
+    }
+
+    @Test
+    void completedOccurrenceKeepsItsSnapshotAndNextGenerationUsesNewRevision() {
+        Context context = context("completed-schedule-change");
+        Chore chore = choreRepository.save(Chore.daily(
+                context.group(),
+                context.ownerMembership(),
+                "공용 청소",
+                ChoreEligibilityMode.ALL_ACTIVE_MEMBERS,
+                LocalTime.of(20, 0),
+                Instant.parse("2026-07-23T00:00:00Z")
+        ));
+        ChoreOccurrence completed = generationService.ensureCurrentOccurrence(
                 chore.getId(),
-                Instant.parse("2026-07-28T03:00:00Z")
+                Instant.parse("2026-07-23T03:00:00Z")
+        );
+        completed.complete(Instant.parse("2026-07-23T04:00:00Z"));
+        occurrenceRepository.saveAndFlush(completed);
+
+        chore.reschedule(ChoreFrequency.DAILY, LocalTime.of(19, 0), null, null);
+        choreRepository.saveAndFlush(chore);
+
+        assertTrue(generationService.rescheduleActiveOccurrence(
+                chore,
+                Instant.parse("2026-07-23T05:00:00Z")
+        ).isEmpty());
+        assertEquals(1, occurrenceRepository.count());
+        assertEquals(0L, completed.getScheduleRevisionSnapshot());
+        assertEquals(Instant.parse("2026-07-23T11:00:00Z"), completed.getDueAt());
+
+        ChoreOccurrence overlapping = generationService.ensureCurrentOccurrence(
+                chore.getId(),
+                Instant.parse("2026-07-23T05:00:00Z")
         );
 
-        assertSame(daily, overlapping);
+        assertSame(completed, overlapping);
+        assertEquals(1, occurrenceRepository.count());
+
+        ChoreOccurrence next = generationService.ensureCurrentOccurrence(
+                chore.getId(),
+                Instant.parse("2026-07-24T05:00:00Z")
+        );
+
         assertEquals(2, occurrenceRepository.count());
-        assertEquals(LocalDate.of(2026, 7, 27), next.getPeriodStart());
-        assertEquals(ChoreFrequency.WEEKLY, next.getFrequencySnapshot());
+        assertEquals(LocalDate.of(2026, 7, 24), next.getPeriodStart());
+        assertEquals(1L, next.getScheduleRevisionSnapshot());
+        assertEquals(Instant.parse("2026-07-24T10:00:00Z"), next.getDueAt());
     }
 
     private Context context(String suffix) {

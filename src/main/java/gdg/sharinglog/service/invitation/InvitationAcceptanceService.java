@@ -16,7 +16,7 @@ import gdg.sharinglog.service.invitation.exception.InvitationNotFoundException;
 import gdg.sharinglog.service.invitation.exception.InvitationUnavailableException;
 import gdg.sharinglog.service.invitation.result.AcceptedInvitation;
 import gdg.sharinglog.service.invitation.result.InvitationPreview;
-import gdg.sharinglog.service.rotation.ChoreEnrollmentService;
+import gdg.sharinglog.service.rotation.enrollment.ChoreEnrollmentService;
 import gdg.sharinglog.service.user.AuthenticatedUserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.core.user.OAuth2User;

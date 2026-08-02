@@ -1,4 +1,4 @@
-package gdg.sharinglog.service.rotation;
+package gdg.sharinglog.service.rotation.enrollment;
 
 import java.time.Instant;
 import java.util.HashMap;

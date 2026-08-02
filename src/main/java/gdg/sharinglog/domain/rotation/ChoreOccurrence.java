@@ -37,7 +37,7 @@ import lombok.NoArgsConstructor;
         },
         uniqueConstraints = @UniqueConstraint(
                 name = "uk_chore_occurrences_chore_period",
-                columnNames = {"chore_id", "period_start"}
+                columnNames = {"chore_id", "schedule_revision_snapshot", "period_start"}
         )
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -70,6 +70,9 @@ public class ChoreOccurrence {
 
     @Column(name = "time_zone_id_snapshot", nullable = false, length = 40)
     private String timeZoneIdSnapshot;
+
+    @Column(name = "schedule_revision_snapshot", nullable = false)
+    private long scheduleRevisionSnapshot;
 
     @Column(name = "period_start", nullable = false)
     private LocalDate periodStart;
@@ -126,6 +129,7 @@ public class ChoreOccurrence {
         this.choreNameSnapshot = chore.getName();
         this.frequencySnapshot = chore.getFrequency();
         this.timeZoneIdSnapshot = chore.getGroup().getTimeZoneId();
+        this.scheduleRevisionSnapshot = chore.getScheduleRevision();
         this.periodStart = Objects.requireNonNull(periodStart, "기간 시작일은 필수입니다.");
         this.periodEndExclusive = Objects.requireNonNull(periodEndExclusive, "기간 종료일은 필수입니다.");
         if (!periodEndExclusive.isAfter(periodStart)) {
@@ -197,6 +201,26 @@ public class ChoreOccurrence {
 
     public Optional<GroupMember> currentAssignee() {
         return Optional.ofNullable(currentAssignment).map(ChoreAssignmentAttempt::getAssignee);
+    }
+
+    public void rescheduleToCurrentRevision(
+            LocalDate periodStart,
+            LocalDate periodEndExclusive,
+            Instant dueAt
+    ) {
+        if (status.isTerminal()) {
+            throw new IllegalStateException("종료된 회차의 일정 스냅샷은 변경할 수 없습니다.");
+        }
+        this.frequencySnapshot = chore.getFrequency();
+        this.timeZoneIdSnapshot = chore.getGroup().getTimeZoneId();
+        this.scheduleRevisionSnapshot = chore.getScheduleRevision();
+        this.periodStart = Objects.requireNonNull(periodStart, "기간 시작일은 필수입니다.");
+        this.periodEndExclusive = Objects.requireNonNull(
+                periodEndExclusive,
+                "기간 종료일은 필수입니다."
+        );
+        this.dueAt = Objects.requireNonNull(dueAt, "마감 시각은 필수입니다.");
+        validateScheduleSnapshot();
     }
 
     public void assign(ChoreAssignmentAttempt assignment) {
