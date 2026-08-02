@@ -67,6 +67,12 @@ class LoginFlowTest {
     }
 
     @Test
+    void errorDispatchIsNotRedirectedToLogin() throws Exception {
+        mockMvc.perform(get("/error"))
+                .andExpect(header().doesNotExist("Location"));
+    }
+
+    @Test
     void allowsCredentialedRequestsFromFrontendOrigin() throws Exception {
         mockMvc.perform(options("/api/auth/csrf")
                         .header("Origin",
@@ -142,6 +148,42 @@ class LoginFlowTest {
                         "invitationUrl.origin !== window.location.origin")))
                 .andExpect(content().string(containsString(
                         "window.location.assign(`/invite/${encodeURIComponent(code)}`)")));
+    }
+
+    @Test
+    void rotationNotificationCheckFrontendCallsAllNotificationApis() throws Exception {
+        mockMvc.perform(get("/rotation.html").with(oauth2Login()))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("id=\"open-notifications\"")))
+                .andExpect(content().string(containsString("id=\"notifications-dialog\"")))
+                .andExpect(content().string(containsString("id=\"notification-due-soon-list\"")))
+                .andExpect(content().string(containsString("id=\"notification-substitute-list\"")));
+
+        mockMvc.perform(get("/js/rotation.js"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("/notifications/summary")))
+                .andExpect(content().string(containsString("/occurrences/due-soon")))
+                .andExpect(content().string(containsString(
+                        "/substitute-requests?box=INBOX&status=PENDING")));
+    }
+
+    @Test
+    void rotationFrontendShowsNewOutboxRequestAndMovesToChangedScheduleTab() throws Exception {
+        mockMvc.perform(get("/rotation.html").with(oauth2Login()))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString(
+                        "<option value=\"OUTBOX\" selected>")));
+
+        mockMvc.perform(get("/js/rotation.js"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString(
+                        "substituteBox.value = \"OUTBOX\"")))
+                .andExpect(content().string(containsString(
+                        "await openSubstituteRequests()")))
+                .andExpect(content().string(containsString(
+                        "activateFrequencyTab(selectedFrequency)")))
+                .andExpect(content().string(containsString(
+                        "scheduleDescription(chore.schedule)")));
     }
 
     // POST /api/auth/logout 호출 시 204가 오고 세션이 invalid 처리되는지 확인

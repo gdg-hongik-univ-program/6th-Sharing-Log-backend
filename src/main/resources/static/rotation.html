@@ -16,6 +16,10 @@
             <p class="copy">공정성 점수가 같은 후보 사이에서만 무작위로 담당자를 정해요.</p>
         </div>
         <div class="rotation-header-actions">
+            <button id="open-notifications" class="secondary-button notification-button" type="button">
+                알림
+                <span id="notification-count" class="notification-count" aria-label="알림 대상 0건">0</span>
+            </button>
             <button id="open-completed-history" class="secondary-button" type="button">
                 완료 이력
             </button>
@@ -202,6 +206,61 @@
             <button class="primary-button full-button" type="submit">변경 저장</button>
             <p id="edit-chore-status" class="rotation-status" role="status"></p>
         </form>
+    </dialog>
+
+    <dialog id="notifications-dialog"
+            class="rotation-dialog rotation-dialog-wide"
+            aria-labelledby="notifications-title">
+        <div class="dialog-heading">
+            <div>
+                <p class="eyebrow">NOTIFICATION API CHECK</p>
+                <h2 id="notifications-title">알림 API 확인</h2>
+            </div>
+            <button id="close-notifications" class="icon-button" type="button" aria-label="닫기">×</button>
+        </div>
+
+        <div class="notification-summary-grid" aria-label="알림 요약">
+            <article class="notification-stat">
+                <span>마감 임박</span>
+                <strong id="notification-due-soon-count">0</strong>
+            </article>
+            <article class="notification-stat">
+                <span>대타 요청</span>
+                <strong id="notification-substitute-count">0</strong>
+            </article>
+            <article class="notification-stat notification-stat-total">
+                <span>합계</span>
+                <strong id="notification-total-count">0</strong>
+            </article>
+        </div>
+
+        <div class="dialog-actions notification-actions">
+            <button id="refresh-notifications" class="secondary-button" type="button">새로고침</button>
+        </div>
+        <p id="notification-status"
+           class="rotation-status"
+           role="status"
+           aria-live="polite"></p>
+
+        <section class="notification-section" aria-labelledby="due-soon-title">
+            <div class="notification-section-heading">
+                <h3 id="due-soon-title">마감 임박 업무</h3>
+                <code>GET /occurrences/due-soon</code>
+            </div>
+            <div id="notification-due-soon-list" class="workflow-list"></div>
+        </section>
+
+        <section class="notification-section" aria-labelledby="pending-substitute-title">
+            <div class="notification-section-heading">
+                <h3 id="pending-substitute-title">받은 대타 요청</h3>
+                <code>GET /substitute-requests?box=INBOX&amp;status=PENDING</code>
+            </div>
+            <div id="notification-substitute-list" class="workflow-list"></div>
+        </section>
+
+        <p class="api-endpoint-note">
+            상단 합계는 <code>GET /notifications/summary</code> 응답과 비교할 수 있습니다.
+        </p>
     </dialog>
 
     <dialog id="substitute-requests-dialog"

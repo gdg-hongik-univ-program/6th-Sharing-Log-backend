@@ -1,4 +1,4 @@
-package gdg.sharinglog.service.rotation;
+package gdg.sharinglog.service.rotation.assignment;
 
 @FunctionalInterface
 public interface DecisionSeedGenerator {

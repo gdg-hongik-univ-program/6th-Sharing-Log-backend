@@ -14,8 +14,8 @@ import gdg.sharinglog.domain.rotation.ChoreEligibilityMode;
 import gdg.sharinglog.domain.rotation.ChoreFrequency;
 import gdg.sharinglog.repository.GroupMemberRepository;
 import gdg.sharinglog.repository.rotation.ChoreRepository;
-import gdg.sharinglog.service.rotation.ChoreEnrollmentService;
-import gdg.sharinglog.service.rotation.OccurrenceGenerationService;
+import gdg.sharinglog.service.rotation.enrollment.ChoreEnrollmentService;
+import gdg.sharinglog.service.rotation.occurrence.OccurrenceGenerationService;
 import gdg.sharinglog.service.rotation.access.RotationActor;
 import gdg.sharinglog.service.rotation.access.RotationActorAccessService;
 import gdg.sharinglog.service.rotation.access.RotationMemberNotFoundException;
@@ -83,9 +83,12 @@ public class ChoreApplicationService {
             String registrationId,
             OAuth2User principal,
             UpdateChoreCommand command,
-            long expectedVersion
+            long expectedVersion,
+            Instant changedAt
     ) {
         Objects.requireNonNull(command, "업무 수정 명령은 필수입니다.");
+        Instant effectiveChangedAt =
+                Objects.requireNonNull(changedAt, "업무 수정 시각은 필수입니다.");
         RotationActor actor =
                 accessService.requireOwnerForUpdate(groupPublicId, registrationId, principal);
         Chore chore = choreRepository
@@ -101,9 +104,10 @@ public class ChoreApplicationService {
         if (command.name() != null) {
             chore.rename(command.name());
         }
+        boolean scheduleChanged = false;
         if (command.schedule() != null) {
             UpdateChoreCommand.Schedule schedule = command.schedule();
-            chore.reschedule(
+            scheduleChanged = chore.reschedule(
                     schedule.frequency(),
                     schedule.dueTime(),
                     schedule.weeklyDueDay(),
@@ -112,6 +116,12 @@ public class ChoreApplicationService {
         }
 
         Chore updated = choreRepository.saveAndFlush(chore);
+        if (scheduleChanged) {
+            occurrenceGenerationService.rescheduleActiveOccurrence(
+                    updated,
+                    effectiveChangedAt
+            );
+        }
         return new ChoreView(updated, currentEligibleMembers(updated));
     }
 

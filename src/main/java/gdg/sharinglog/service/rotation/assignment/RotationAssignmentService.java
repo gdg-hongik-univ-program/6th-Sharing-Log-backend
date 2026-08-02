@@ -1,4 +1,4 @@
-package gdg.sharinglog.service.rotation;
+package gdg.sharinglog.service.rotation.assignment;
 
 import static gdg.sharinglog.domain.rotation.AssignmentEndReason.SAME_OCCURRENCE_EXCLUSIONS;
 
@@ -29,6 +29,7 @@ import gdg.sharinglog.repository.rotation.RotationDecisionLogRepository;
 import gdg.sharinglog.rotation.engine.RotationAssignmentEngine;
 import gdg.sharinglog.rotation.engine.RotationAssignmentResult;
 import gdg.sharinglog.rotation.engine.RotationCandidate;
+import gdg.sharinglog.service.rotation.exception.OccurrenceNotFoundException;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import lombok.RequiredArgsConstructor;

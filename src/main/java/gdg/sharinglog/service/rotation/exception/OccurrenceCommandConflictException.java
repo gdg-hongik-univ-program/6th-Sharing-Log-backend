@@ -1,4 +1,4 @@
-package gdg.sharinglog.service.rotation;
+package gdg.sharinglog.service.rotation.exception;
 
 public class OccurrenceCommandConflictException extends RuntimeException {
 

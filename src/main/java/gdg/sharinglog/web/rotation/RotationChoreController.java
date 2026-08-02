@@ -132,7 +132,8 @@ public class RotationChoreController {
                             authentication.getAuthorizedClientRegistrationId(),
                             authentication.getPrincipal(),
                             toCommand(request),
-                            expectedVersion.value()
+                            expectedVersion.value(),
+                            Instant.now()
                     );
                     ChoreResponse body = viewMapper.chore(updated);
                     return new CommandResponse<>(

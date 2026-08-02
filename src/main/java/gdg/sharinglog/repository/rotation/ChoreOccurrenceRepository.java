@@ -71,7 +71,11 @@ public interface ChoreOccurrenceRepository extends JpaRepository<ChoreOccurrence
     @Query("select occurrence from ChoreOccurrence occurrence where occurrence.id = :occurrenceId")
     Optional<ChoreOccurrence> findByIdForUpdate(@Param("occurrenceId") Long occurrenceId);
 
-    Optional<ChoreOccurrence> findByChore_IdAndPeriodStart(Long choreId, LocalDate periodStart);
+    Optional<ChoreOccurrence> findByChore_IdAndScheduleRevisionSnapshotAndPeriodStart(
+            Long choreId,
+            long scheduleRevisionSnapshot,
+            LocalDate periodStart
+    );
 
     Optional<ChoreOccurrence>
     findFirstByChore_IdAndPeriodStartBeforeOrderByPeriodStartDesc(
@@ -80,7 +84,32 @@ public interface ChoreOccurrenceRepository extends JpaRepository<ChoreOccurrence
     );
 
     Optional<ChoreOccurrence>
+    findFirstByChore_IdAndScheduleRevisionSnapshotOrderByPeriodEndExclusiveDescIdDesc(
+            Long choreId,
+            long scheduleRevisionSnapshot
+    );
+
+    Optional<ChoreOccurrence>
     findFirstByChore_IdOrderByPeriodEndExclusiveDescIdDesc(Long choreId);
+
+    @EntityGraph(attributePaths = {"chore", "currentAssignment", "currentAssignment.assignee"})
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select occurrence
+            from ChoreOccurrence occurrence
+            where occurrence.chore.id = :choreId
+              and occurrence.periodStart <= :activeOn
+              and occurrence.periodEndExclusive > :activeOn
+              and occurrence.status in (
+                  gdg.sharinglog.domain.rotation.OccurrenceStatus.ASSIGNED,
+                  gdg.sharinglog.domain.rotation.OccurrenceStatus.NEEDS_ATTENTION
+              )
+            order by occurrence.id asc
+            """)
+    List<ChoreOccurrence> findAllOpenActiveOnByChoreIdForUpdate(
+            @Param("choreId") Long choreId,
+            @Param("activeOn") LocalDate activeOn
+    );
 
     @EntityGraph(attributePaths = {"chore", "currentAssignment", "currentAssignment.assignee"})
     @Lock(LockModeType.PESSIMISTIC_WRITE)

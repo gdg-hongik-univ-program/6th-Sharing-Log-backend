@@ -171,6 +171,23 @@ h1 {
     background: #fff;
 }
 
+.notification-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.notification-count {
+    min-width: 20px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    color: #fff;
+    background: #d93025;
+    font-size: 11px;
+    line-height: 16px;
+    text-align: center;
+}
+
 .danger-button {
     border-color: #c5221f;
     color: #fff;
@@ -374,6 +391,73 @@ button:disabled {
     border-top: 1px solid #dadce0;
 }
 
+.notification-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin: 20px 0 12px;
+}
+
+.notification-stat {
+    display: grid;
+    gap: 6px;
+    padding: 14px;
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+    background: #f8fafd;
+}
+
+.notification-stat span {
+    color: #5f6368;
+    font-size: 12px;
+}
+
+.notification-stat strong {
+    color: #1a73e8;
+    font-size: 24px;
+}
+
+.notification-stat-total {
+    border-color: #1a73e8;
+    background: #eef4fd;
+}
+
+.notification-actions {
+    justify-content: flex-end;
+}
+
+.notification-section + .notification-section {
+    margin-top: 24px;
+}
+
+.notification-section-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.notification-section-heading code,
+.api-endpoint-note code {
+    color: #5f6368;
+    font-size: 11px;
+}
+
+.notification-empty {
+    margin: 0;
+    padding: 18px;
+    border: 1px dashed #dadce0;
+    color: #5f6368;
+    text-align: center;
+}
+
+.api-endpoint-note {
+    margin: 24px 0 0;
+    color: #5f6368;
+    font-size: 12px;
+}
+
 .rotation-dialog h3,
 .rotation-dialog h4,
 .workflow-card h3 {
@@ -452,5 +536,14 @@ button:disabled {
 
     .management-row-actions button {
         flex: 1 1 auto;
+    }
+
+    .notification-summary-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .notification-section-heading {
+        align-items: flex-start;
+        flex-direction: column;
     }
 }
