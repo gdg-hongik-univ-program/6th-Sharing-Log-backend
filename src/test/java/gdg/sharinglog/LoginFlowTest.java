@@ -3,6 +3,7 @@ package gdg.sharinglog;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.startsWith;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oauth2Login;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -17,11 +18,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
+import org.springframework.security.web.savedrequest.SavedRequest;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 @SpringBootTest(properties = {
-        "app.frontend-origin=https://6th-sharing-log-frontend-teal.vercel.app/",
-        "app.oauth2-failure-url=https://6th-sharing-log-frontend-teal.vercel.app/?error=true"
+        "app.frontend-origin=https://6th-sharing-log-frontend-teal.vercel.app/"
 })
 @AutoConfigureMockMvc
 class LoginFlowTest {
@@ -103,6 +106,18 @@ class LoginFlowTest {
                         .header("Origin", "https://untrusted.example"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(header().string("Location", endsWith("/login")));
+    }
+
+    @Test
+    void unauthenticatedApiRequestDoesNotOverrideFrontendRedirect() throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/auth/me"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(header().string("Location", endsWith("/login")))
+                .andReturn();
+
+        SavedRequest savedRequest = new HttpSessionRequestCache()
+                .getRequest(result.getRequest(), result.getResponse());
+        assertNull(savedRequest);
     }
 
     @Test

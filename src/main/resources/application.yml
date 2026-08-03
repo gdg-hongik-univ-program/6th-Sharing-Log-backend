@@ -62,8 +62,8 @@ cloud:
 app:
   frontend-origin: "${APP_FRONTEND_ORIGIN:${APP_FRONTEND_BASE_URL:http://localhost:8080}}"
   public-base-url: "${APP_PUBLIC_BASE_URL:}"
-  oauth2-success-url: "${APP_OAUTH2_SUCCESS_URL:${APP_FRONTEND_BASE_URL:/}}"
-  oauth2-failure-url: "${APP_OAUTH2_FAILURE_URL:/login?error=true}"
+  oauth2-success-url: "${APP_OAUTH2_SUCCESS_URL:}"
+  oauth2-failure-url: "${APP_OAUTH2_FAILURE_URL:}"
 
 server:
   port: ${SERVER_PORT:8080}

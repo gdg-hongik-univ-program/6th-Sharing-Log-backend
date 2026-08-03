@@ -26,7 +26,8 @@ class OAuth2SuccessHandlerTest {
         OAuth2UserPersistenceService persistenceService = mock(OAuth2UserPersistenceService.class);
         OAuth2SuccessHandler successHandler = new OAuth2SuccessHandler(
                 persistenceService,
-                SUCCESS_URL
+                SUCCESS_URL,
+                "http://localhost:5173"
         );
         OAuth2User principal = new DefaultOAuth2User(
                 Set.of(new SimpleGrantedAuthority("ROLE_USER")),
@@ -52,7 +53,8 @@ class OAuth2SuccessHandlerTest {
         OAuth2UserPersistenceService persistenceService = mock(OAuth2UserPersistenceService.class);
         OAuth2SuccessHandler successHandler = new OAuth2SuccessHandler(
                 persistenceService,
-                SUCCESS_URL
+                SUCCESS_URL,
+                "http://localhost:5173"
         );
         OAuth2User principal = new DefaultOAuth2User(
                 Set.of(new SimpleGrantedAuthority("ROLE_USER")),
@@ -82,5 +84,34 @@ class OAuth2SuccessHandlerTest {
                 "http://localhost/invite/AbCdEfGhIjKlMnOpQrStUv?continue",
                 response.getRedirectedUrl()
         );
+    }
+
+    @Test
+    void redirectsToFrontendWhenSuccessUrlIsBlank() throws Exception {
+        OAuth2UserPersistenceService persistenceService = mock(OAuth2UserPersistenceService.class);
+        OAuth2SuccessHandler successHandler = new OAuth2SuccessHandler(
+                persistenceService,
+                "  ",
+                "https://frontend.example/"
+        );
+        OAuth2User principal = new DefaultOAuth2User(
+                Set.of(new SimpleGrantedAuthority("ROLE_USER")),
+                Map.of("id", "naver-user-id"),
+                "id"
+        );
+        OAuth2AuthenticationToken authentication = new OAuth2AuthenticationToken(
+                principal,
+                principal.getAuthorities(),
+                "naver"
+        );
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        successHandler.onAuthenticationSuccess(
+                new MockHttpServletRequest(),
+                response,
+                authentication
+        );
+
+        assertEquals("https://frontend.example/", response.getRedirectedUrl());
     }
 }
