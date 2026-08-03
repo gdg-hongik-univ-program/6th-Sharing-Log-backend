@@ -23,6 +23,8 @@ public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> 
             MemberStatus status
     );
 
+    boolean existsByUser_IdAndStatus(Long userId, MemberStatus status);
+
     @EntityGraph(attributePaths = "user")
     List<GroupMember> findAllByGroup_Id(Long groupId);
 

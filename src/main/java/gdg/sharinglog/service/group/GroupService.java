@@ -1,10 +1,12 @@
 package gdg.sharinglog.service.group;
 
 import gdg.sharinglog.domain.GroupMember;
+import gdg.sharinglog.domain.MemberStatus;
 import gdg.sharinglog.domain.SharingGroup;
 import gdg.sharinglog.domain.User;
 import gdg.sharinglog.repository.GroupMemberRepository;
 import gdg.sharinglog.repository.SharingGroupRepository;
+import gdg.sharinglog.service.group.exception.AlreadyInAnotherGroupException;
 import gdg.sharinglog.service.group.result.CreatedGroup;
 import gdg.sharinglog.service.user.AuthenticatedUserService;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +27,10 @@ public class GroupService {
     @Transactional
     public CreatedGroup createGroup(String requestedName, String registrationId, OAuth2User oAuth2User) {
         String groupName = normalizeGroupName(requestedName);
-        User creator = authenticatedUserService.requireUser(registrationId, oAuth2User);
+        User creator = authenticatedUserService.requireUserForUpdate(registrationId, oAuth2User);
+        if (groupMemberRepository.existsByUser_IdAndStatus(creator.getId(), MemberStatus.ACTIVE)) {
+            throw new AlreadyInAnotherGroupException();
+        }
 
         SharingGroup group = groupRepository.save(new SharingGroup(groupName, creator));
         GroupMember ownerMembership = groupMemberRepository.save(GroupMember.owner(group, creator));

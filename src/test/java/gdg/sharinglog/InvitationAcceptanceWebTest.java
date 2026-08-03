@@ -217,6 +217,21 @@ class InvitationAcceptanceWebTest {
     }
 
     @Test
+    void rejectsAcceptingWhileActiveInAnotherGroup() throws Exception {
+        SharingGroup otherGroup = groupRepository.save(new SharingGroup("다른 집", secondInvitee));
+        groupMemberRepository.save(GroupMember.owner(otherGroup, secondInvitee));
+
+        mockMvc.perform(post("/api/invitations/{code}/accept", INVITATION_CODE)
+                        .with(csrf())
+                        .with(oauthUser(SECOND_INVITEE_PROVIDER_ID)))
+                .andExpect(status().isConflict());
+
+        assertTrue(groupMemberRepository
+                .findByGroup_IdAndUser_Id(group.getId(), secondInvitee.getId())
+                .isEmpty());
+    }
+
+    @Test
     void leftMembershipIsJoinableAndReactivatedWithoutCreatingDuplicate() throws Exception {
         GroupMember leftMembership = groupMemberRepository.save(
                 GroupMember.member(group, invitee)
