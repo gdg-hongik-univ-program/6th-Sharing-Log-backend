@@ -145,6 +145,34 @@ class GroupCreationApiTest {
         assertTrue(groupMemberRepository.findAll().isEmpty());
     }
 
+    @Test
+    void rejectsCreatingASecondGroupWhileActiveInAnother() throws Exception {
+        mockMvc.perform(post("/api/groups")
+                        .with(csrf())
+                        .with(oauth2Login()
+                                .clientRegistration(googleClientRegistration())
+                                .attributes(attributes -> attributes.put("sub", GOOGLE_USER_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"첫 번째 집"}
+                                """))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/groups")
+                        .with(csrf())
+                        .with(oauth2Login()
+                                .clientRegistration(googleClientRegistration())
+                                .attributes(attributes -> attributes.put("sub", GOOGLE_USER_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"두 번째 집"}
+                                """))
+                .andExpect(status().isConflict());
+
+        assertEquals(1, groupRepository.count());
+        assertEquals(1, groupMemberRepository.count());
+    }
+
     private ClientRegistration googleClientRegistration() {
         return ClientRegistration.withRegistrationId("google")
                 .clientId("test-google-client-id")
