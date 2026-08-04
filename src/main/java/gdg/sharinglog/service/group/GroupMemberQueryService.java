@@ -3,6 +3,8 @@ package gdg.sharinglog.service.group;
 import java.util.Comparator;
 import java.util.List;
 
+import java.util.Optional;
+
 import gdg.sharinglog.domain.GroupMember;
 import gdg.sharinglog.domain.GroupRole;
 import gdg.sharinglog.domain.MemberStatus;
@@ -13,6 +15,7 @@ import gdg.sharinglog.repository.SharingGroupRepository;
 import gdg.sharinglog.service.group.exception.GroupMemberAccessDeniedException;
 import gdg.sharinglog.service.group.exception.GroupNotFoundException;
 import gdg.sharinglog.service.group.result.GroupMembers;
+import gdg.sharinglog.service.group.result.MyGroup;
 import gdg.sharinglog.service.user.AuthenticatedUserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.core.user.OAuth2User;
@@ -58,6 +61,21 @@ public class GroupMemberQueryService {
                 requesterMembership.getRole(),
                 members
         );
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<MyGroup> findMyGroup(String registrationId, OAuth2User oAuth2User) {
+        User user = authenticatedUserService.requireUser(registrationId, oAuth2User);
+        return groupMemberRepository
+                .findByUser_IdAndStatus(user.getId(), MemberStatus.ACTIVE)
+                .map(membership -> new MyGroup(
+                        membership.getGroup().getPublicId(),
+                        membership.getPublicId(),
+                        membership.getVersion(),
+                        membership.getGroup().getName(),
+                        membership.getGroup().getAddress(),
+                        membership.getRole()
+                ));
     }
 
     private GroupMembers.Member toMember(GroupMember membership, Long requesterId) {

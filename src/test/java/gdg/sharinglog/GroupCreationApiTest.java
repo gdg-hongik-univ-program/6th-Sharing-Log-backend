@@ -3,6 +3,7 @@ package gdg.sharinglog;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oauth2Login;
@@ -96,6 +97,42 @@ class GroupCreationApiTest {
     }
 
     @Test
+    void createsGroupWithAddress() throws Exception {
+        mockMvc.perform(post("/api/groups")
+                        .with(csrf())
+                        .with(oauth2Login()
+                                .clientRegistration(googleClientRegistration())
+                                .attributes(attributes -> attributes.put("sub", GOOGLE_USER_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"우리 집","address":"  서울시 강남구 역삼동  "}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.address").value("서울시 강남구 역삼동"));
+
+        SharingGroup group = groupRepository.findAll().getFirst();
+        assertEquals("서울시 강남구 역삼동", group.getAddress());
+    }
+
+    @Test
+    void createsGroupWithoutAddress() throws Exception {
+        mockMvc.perform(post("/api/groups")
+                        .with(csrf())
+                        .with(oauth2Login()
+                                .clientRegistration(googleClientRegistration())
+                                .attributes(attributes -> attributes.put("sub", GOOGLE_USER_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"우리 집"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.address").doesNotExist());
+
+        SharingGroup group = groupRepository.findAll().getFirst();
+        assertNull(group.getAddress());
+    }
+
+    @Test
     void rejectsBlankGroupNameWithoutCreatingData() throws Exception {
         mockMvc.perform(post("/api/groups")
                         .with(csrf())
@@ -143,6 +180,34 @@ class GroupCreationApiTest {
 
         assertTrue(groupRepository.findAll().isEmpty());
         assertTrue(groupMemberRepository.findAll().isEmpty());
+    }
+
+    @Test
+    void rejectsCreatingASecondGroupWhileActiveInAnother() throws Exception {
+        mockMvc.perform(post("/api/groups")
+                        .with(csrf())
+                        .with(oauth2Login()
+                                .clientRegistration(googleClientRegistration())
+                                .attributes(attributes -> attributes.put("sub", GOOGLE_USER_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"첫 번째 집"}
+                                """))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/groups")
+                        .with(csrf())
+                        .with(oauth2Login()
+                                .clientRegistration(googleClientRegistration())
+                                .attributes(attributes -> attributes.put("sub", GOOGLE_USER_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"두 번째 집"}
+                                """))
+                .andExpect(status().isConflict());
+
+        assertEquals(1, groupRepository.count());
+        assertEquals(1, groupMemberRepository.count());
     }
 
     private ClientRegistration googleClientRegistration() {

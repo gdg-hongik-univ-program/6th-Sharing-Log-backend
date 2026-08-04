@@ -12,6 +12,7 @@ import gdg.sharinglog.domain.User;
 import gdg.sharinglog.repository.GroupInvitationRepository;
 import gdg.sharinglog.repository.GroupMemberRepository;
 import gdg.sharinglog.repository.SharingGroupRepository;
+import gdg.sharinglog.service.group.exception.AlreadyInAnotherGroupException;
 import gdg.sharinglog.service.invitation.exception.InvitationNotFoundException;
 import gdg.sharinglog.service.invitation.exception.InvitationUnavailableException;
 import gdg.sharinglog.service.invitation.result.AcceptedInvitation;
@@ -72,11 +73,14 @@ public class InvitationAcceptanceService {
         Optional<GroupMember> existingMembership = groupMemberRepository
                 .findByGroup_IdAndUser_Id(group.getId(), user.getId());
         Instant acceptedAt = Instant.now();
+        if (existingMembership.isPresent() && existingMembership.get().isActive()) {
+            return acceptance(existingMembership.get(), false);
+        }
+        if (groupMemberRepository.existsByUser_IdAndStatus(user.getId(), MemberStatus.ACTIVE)) {
+            throw new AlreadyInAnotherGroupException();
+        }
         if (existingMembership.isPresent()) {
             GroupMember membership = existingMembership.get();
-            if (membership.isActive()) {
-                return acceptance(membership, false);
-            }
             membership.reactivate(acceptedAt);
             GroupMember reactivated = groupMemberRepository.saveAndFlush(membership);
             choreEnrollmentService.activateMemberEnrollments(reactivated, acceptedAt);
