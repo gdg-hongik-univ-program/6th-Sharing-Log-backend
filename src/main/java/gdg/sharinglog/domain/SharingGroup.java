@@ -42,6 +42,9 @@ public class SharingGroup {
     @Column(name = "name", nullable = false, length = 50)
     private String name;
 
+    @Column(name = "address", length = 255)
+    private String address;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(
             name = "created_by_user_id",
@@ -76,5 +79,9 @@ public class SharingGroup {
     public void configureSchedulePolicy(ZoneId timeZone, DayOfWeek weekStartsOn) {
         this.timeZoneId = Objects.requireNonNull(timeZone, "그룹 시간대는 필수입니다.").getId();
         this.weekStartsOn = Objects.requireNonNull(weekStartsOn, "주 시작 요일은 필수입니다.");
+    }
+
+    public void updateAddress(String address) {
+        this.address = address == null || address.isBlank() ? null : address.trim();
     }
 }

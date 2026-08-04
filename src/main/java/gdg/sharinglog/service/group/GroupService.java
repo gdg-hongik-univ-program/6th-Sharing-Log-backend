@@ -25,20 +25,28 @@ public class GroupService {
     private final AuthenticatedUserService authenticatedUserService;
 
     @Transactional
-    public CreatedGroup createGroup(String requestedName, String registrationId, OAuth2User oAuth2User) {
+    public CreatedGroup createGroup(
+            String requestedName,
+            String requestedAddress,
+            String registrationId,
+            OAuth2User oAuth2User
+    ) {
         String groupName = normalizeGroupName(requestedName);
         User creator = authenticatedUserService.requireUserForUpdate(registrationId, oAuth2User);
         if (groupMemberRepository.existsByUser_IdAndStatus(creator.getId(), MemberStatus.ACTIVE)) {
             throw new AlreadyInAnotherGroupException();
         }
 
-        SharingGroup group = groupRepository.save(new SharingGroup(groupName, creator));
+        SharingGroup group = new SharingGroup(groupName, creator);
+        group.updateAddress(requestedAddress);
+        group = groupRepository.save(group);
         GroupMember ownerMembership = groupMemberRepository.save(GroupMember.owner(group, creator));
 
         return new CreatedGroup(
                 group.getId(),
                 group.getPublicId(),
                 group.getName(),
+                group.getAddress(),
                 ownerMembership.getId(),
                 ownerMembership.getPublicId(),
                 ownerMembership.getRole(),
