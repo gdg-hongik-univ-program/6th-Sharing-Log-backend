@@ -8,6 +8,7 @@ public record MyGroupResponse(
         String membershipPublicId,
         long membershipVersion,
         String groupName,
+        String groupAddress,
         GroupRole role
 ) {
 
@@ -17,6 +18,7 @@ public record MyGroupResponse(
                 myGroup.membershipPublicId(),
                 myGroup.membershipVersion(),
                 myGroup.groupName(),
+                myGroup.groupAddress(),
                 myGroup.role()
         );
     }
