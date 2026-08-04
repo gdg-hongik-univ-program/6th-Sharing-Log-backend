@@ -3,11 +3,15 @@ git switch -c feature/#50-group-api-check-ui      # 타입/이슈번호-작업�
 
 #### 배포 흐름
 
-코딩 - 빌드 - 명령어 2개 powershell 입력
+코딩 - 빌드 - 명령어 3개 powershell 입력
+
+Set-Location 'C:\Users\SAMSUNG\Desktop\Sharing Log\sharingLog' # pc마다 다름
+
 $env:JAVA_HOME='C:\Users\SAMSUNG\.jdks\corretto-26.0.1'
+
 .\gradlew.bat clean ebBundle
 
-zip 파일 배포(업로드)
+-> zip 파일 배포(업로드)
 
 
 ## Google 로그인 실행 방법
