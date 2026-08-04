@@ -142,7 +142,9 @@ class LoginFlowTest {
                 .andExpect(content().string(containsString("id=\"invite-link\"")))
                 .andExpect(content().string(containsString("id=\"members-form\"")))
                 .andExpect(content().string(containsString("id=\"member-list-result\"")))
-                .andExpect(content().string(containsString("/js/group-setup.js")));
+                .andExpect(content().string(containsString("/js/group-setup.js")))
+                .andExpect(content().string(containsString("id=\"logout-button\"")))
+                .andExpect(content().string(containsString("/js/logout.js")));
     }
 
     @Test
@@ -150,7 +152,9 @@ class LoginFlowTest {
         mockMvc.perform(get("/"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.not(
-                        containsString("id=\"group-form\""))));
+                        containsString("id=\"group-form\""))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        containsString("id=\"logout-button\""))));
     }
 
     @Test
@@ -164,6 +168,30 @@ class LoginFlowTest {
                         "invitationUrl.origin !== window.location.origin")))
                 .andExpect(content().string(containsString(
                         "window.location.assign(`/invite/${encodeURIComponent(code)}`)")));
+    }
+
+    @Test
+    void authenticatedTemporaryPagesShowLogoutButton() throws Exception {
+        mockMvc.perform(get("/booking-profile-check.html").with(oauth2Login()))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("id=\"logout-button\"")))
+                .andExpect(content().string(containsString("/js/logout.js")));
+
+        mockMvc.perform(get("/rotation.html").with(oauth2Login()))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("id=\"logout-button\"")))
+                .andExpect(content().string(containsString("/js/logout.js")));
+    }
+
+    @Test
+    void logoutScriptPostsToApiAndRedirectsToLogin() throws Exception {
+        mockMvc.perform(get("/js/logout.js"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("/api/auth/logout")))
+                .andExpect(content().string(containsString("method: \"POST\"")))
+                .andExpect(content().string(containsString("credentials: \"include\"")))
+                .andExpect(content().string(containsString(
+                        "window.location.assign(\"/login\")")));
     }
 
     @Test
