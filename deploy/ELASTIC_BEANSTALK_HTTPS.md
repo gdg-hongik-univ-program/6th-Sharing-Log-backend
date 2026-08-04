@@ -3,6 +3,26 @@
 아래 예시는 로컬 Vite 프론트 `http://localhost:5173`과 배포 백엔드
 `https://api.example.com`을 연결하는 구성이다.
 
+## 현재 Single instance 환경: sslip.io + Nginx + Let's Encrypt
+
+로드 밸런서가 없는 Single instance 환경에서는 ALB/ACM 리스너 대신 인스턴스의
+Nginx가 HTTPS를 종료한다. Elastic IP가 `43.200.12.73`이면 공개 백엔드 호스트는
+`sharinglog-43-200-12-73.sslip.io`처럼 정한다. Elastic IP를 유지해야 이 호스트와
+인증서, OAuth callback URL이 유지된다.
+
+소스에 포함된 `.platform` 배포 설정은 다음 환경 변수를 사용해 매 배포 뒤 Certbot
+인증서와 Nginx HTTPS 리다이렉트를 다시 적용한다.
+
+```properties
+HTTPS_PUBLIC_HOST=sharinglog-43-200-12-73.sslip.io
+CERTBOT_EMAIL=<인증서 만료 알림을 받을 이메일>
+```
+
+- 보안 그룹은 TCP `80`, `443`을 인터넷에 열고, 애플리케이션 포트 `5000`은 열지 않는다.
+- 최초 발급과 인스턴스 교체 후 재발급에는 포트 `80`이 필요하다.
+- Let’s Encrypt는 짧은 기간에 반복 발급하면 제한될 수 있으므로, 배포 실패를 반복하지
+  않는다.
+
 ## 1. HTTPS 준비
 
 1. Elastic Beanstalk 환경과 같은 리전의 AWS Certificate Manager에서
