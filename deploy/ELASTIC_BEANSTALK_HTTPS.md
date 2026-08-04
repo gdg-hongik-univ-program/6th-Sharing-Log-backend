@@ -10,8 +10,10 @@ Nginx가 HTTPS를 종료한다. Elastic IP가 `43.200.12.73`이면 공개 백엔
 `sharinglog-43-200-12-73.sslip.io`처럼 정한다. Elastic IP를 유지해야 이 호스트와
 인증서, OAuth callback URL이 유지된다.
 
-소스에 포함된 `.platform` 배포 설정은 다음 환경 변수를 사용해 매 배포 뒤 Certbot
-인증서와 Nginx HTTPS 리다이렉트를 다시 적용한다.
+소스에 포함된 `.platform` 배포 설정은 다음 환경 변수를 사용한다. 매 배포 뒤
+Certbot이 인증서를 발급하거나 기존 인증서를 재사용하고, Elastic Beanstalk가
+기본 Nginx 설정을 다시 생성하더라도 별도의 `/etc/nginx/conf.d/https.conf`와
+HTTP 리다이렉트 설정을 다시 만든다.
 
 ```properties
 HTTPS_PUBLIC_HOST=sharinglog-43-200-12-73.sslip.io
@@ -20,6 +22,9 @@ CERTBOT_EMAIL=<인증서 만료 알림을 받을 이메일>
 
 - 보안 그룹은 TCP `80`, `443`을 인터넷에 열고, 애플리케이션 포트 `5000`은 열지 않는다.
 - 최초 발급과 인스턴스 교체 후 재발급에는 포트 `80`이 필요하다.
+- `SERVER_PORT`를 생략하면 HTTPS 프록시는 Elastic Beanstalk Java SE 기본값인
+  `5000`을 사용한다.
+- 배포 훅은 `certbot-renew.timer`와 인증서 갱신 후 Nginx reload 훅을 활성화한다.
 - Let’s Encrypt는 짧은 기간에 반복 발급하면 제한될 수 있으므로, 배포 실패를 반복하지
   않는다.
 
