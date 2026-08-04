@@ -26,6 +26,7 @@ public class GroupController {
                                                      OAuth2AuthenticationToken authentication) {
         GroupResponse response = GroupResponse.from(groupService.createGroup(
                 request.name(),
+                request.address(),
                 authentication.getAuthorizedClientRegistrationId(),
                 authentication.getPrincipal()
         ));
