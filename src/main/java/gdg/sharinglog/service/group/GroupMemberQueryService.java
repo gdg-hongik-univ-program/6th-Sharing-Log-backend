@@ -73,6 +73,7 @@ public class GroupMemberQueryService {
                         membership.getPublicId(),
                         membership.getVersion(),
                         membership.getGroup().getName(),
+                        membership.getGroup().getAddress(),
                         membership.getRole()
                 ));
     }

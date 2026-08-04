@@ -7,6 +7,7 @@ public record MyGroup(
         String membershipPublicId,
         long membershipVersion,
         String groupName,
+        String groupAddress,
         GroupRole role
 ) {
 }

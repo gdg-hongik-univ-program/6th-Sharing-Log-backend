@@ -55,7 +55,9 @@ class MyGroupApiTest {
 
     @Test
     void returnsActiveGroupWithMembershipVersion() throws Exception {
-        SharingGroup group = groupRepository.save(new SharingGroup("우리 집", user));
+        SharingGroup group = new SharingGroup("우리 집", user);
+        group.updateAddress("서울시 강남구 역삼동");
+        group = groupRepository.save(group);
         GroupMember membership = groupMemberRepository.save(GroupMember.owner(group, user));
 
         mockMvc.perform(get("/api/groups/me")
@@ -67,6 +69,7 @@ class MyGroupApiTest {
                 .andExpect(jsonPath("$.membershipPublicId").value(membership.getPublicId()))
                 .andExpect(jsonPath("$.membershipVersion").value(membership.getVersion()))
                 .andExpect(jsonPath("$.groupName").value("우리 집"))
+                .andExpect(jsonPath("$.groupAddress").value("서울시 강남구 역삼동"))
                 .andExpect(jsonPath("$.role").value("OWNER"));
     }
 
