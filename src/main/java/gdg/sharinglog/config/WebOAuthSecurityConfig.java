@@ -14,6 +14,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
+import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -57,6 +59,15 @@ public class WebOAuthSecurityConfig {
                         .successHandler(oAuth2SuccessHandler)
                         .failureHandler(oAuth2FailureHandler)
                 )
+                .exceptionHandling(exceptions -> exceptions
+                        .defaultAuthenticationEntryPointFor(
+                                new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED),
+                                WebOAuthSecurityConfig::isApiRequest
+                        )
+                        .defaultAuthenticationEntryPointFor(
+                                new LoginUrlAuthenticationEntryPoint("/login"),
+                                request -> !isApiRequest(request)
+                        ))
                 .requestCache(cache -> cache.requestCache(invitationRequestCache()))
 
                 // 해당 요청만 CSRF 예외 처리하고
@@ -161,6 +172,10 @@ public class WebOAuthSecurityConfig {
     ) {
         return "GET".equals(request.getMethod())
                 && requestPath(request).startsWith("/invite/");
+    }
+
+    private static boolean isApiRequest(jakarta.servlet.http.HttpServletRequest request) {
+        return requestPath(request).startsWith("/api/");
     }
 
     private static String requestPath(jakarta.servlet.http.HttpServletRequest request) {

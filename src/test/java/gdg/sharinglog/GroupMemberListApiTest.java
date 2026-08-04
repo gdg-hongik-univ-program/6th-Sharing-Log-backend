@@ -1,7 +1,6 @@
 package gdg.sharinglog;
 
 import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
@@ -154,10 +153,10 @@ class GroupMemberListApiTest {
     }
 
     @Test
-    void anonymousUserIsRedirectedToLogin() throws Exception {
+    void anonymousUserReceivesUnauthorized() throws Exception {
         mockMvc.perform(get("/api/groups/{groupId}/members", group.getId()))
-                .andExpect(status().is3xxRedirection())
-                .andExpect(header().string("Location", endsWith("/login")));
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().doesNotExist("Location"));
     }
 
     private void leaveMember() {

@@ -3,7 +3,6 @@ package gdg.sharinglog;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.startsWith;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oauth2Login;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -18,13 +17,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.mock.web.MockHttpSession;
-import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
-import org.springframework.security.web.savedrequest.SavedRequest;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
 
 @SpringBootTest(properties = {
-        "app.frontend-origin=https://6th-sharing-log-frontend-teal.vercel.app/"
+        "app.frontend-origin=http://localhost:5173/"
 })
 @AutoConfigureMockMvc
 class LoginFlowTest {
@@ -65,7 +61,7 @@ class LoginFlowTest {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(header().string(
                         "Location",
-                        "https://6th-sharing-log-frontend-teal.vercel.app/?error=true"
+                        "http://localhost:5173/?error=true"
                 ));
     }
 
@@ -79,12 +75,12 @@ class LoginFlowTest {
     void allowsCredentialedRequestsFromFrontendOrigin() throws Exception {
         mockMvc.perform(options("/api/auth/csrf")
                         .header("Origin",
-                                "https://6th-sharing-log-frontend-teal.vercel.app")
+                                "http://localhost:5173")
                         .header("Access-Control-Request-Method", "GET"))
                 .andExpect(status().isOk())
                 .andExpect(header().string(
                         "Access-Control-Allow-Origin",
-                        "https://6th-sharing-log-frontend-teal.vercel.app"
+                        "http://localhost:5173"
                 ))
                 .andExpect(header().string(
                         "Access-Control-Allow-Credentials",
@@ -109,15 +105,20 @@ class LoginFlowTest {
     }
 
     @Test
-    void unauthenticatedApiRequestDoesNotOverrideFrontendRedirect() throws Exception {
-        MvcResult result = mockMvc.perform(get("/api/auth/me"))
-                .andExpect(status().is3xxRedirection())
-                .andExpect(header().string("Location", endsWith("/login")))
-                .andReturn();
-
-        SavedRequest savedRequest = new HttpSessionRequestCache()
-                .getRequest(result.getRequest(), result.getResponse());
-        assertNull(savedRequest);
+    void unauthenticatedApiRequestReturnsUnauthorizedWithoutLoginRedirect() throws Exception {
+        mockMvc.perform(get("/api/auth/me")
+                        .header("Origin",
+                                "http://localhost:5173"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().doesNotExist("Location"))
+                .andExpect(header().string(
+                        "Access-Control-Allow-Origin",
+                        "http://localhost:5173"
+                ))
+                .andExpect(header().string(
+                        "Access-Control-Allow-Credentials",
+                        "true"
+                ));
     }
 
     @Test
