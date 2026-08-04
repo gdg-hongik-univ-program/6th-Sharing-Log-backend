@@ -46,24 +46,39 @@ public class HomeController {
 
                             <hr>
                             <h2>초대 링크로 참가</h2>
-                            <p>받은 초대 링크나 22자 초대 코드를 입력해 주세요.</p>
+                            <p>초대 화면을 열거나 API로 바로 수락해 409 응답을 확인할 수 있습니다.</p>
                             <form id="join-invitation-form">
                                 <p>
                                     <label for="join-invitation-input">초대 링크 또는 코드</label><br>
                                     <input id="join-invitation-input" name="invitation" type="text"
                                            autocomplete="off" required>
-                                    <button id="join-invitation-button" type="submit">초대 확인</button>
+                                    <button id="join-invitation-button" type="submit">초대 화면 열기</button>
+                                    <button id="accept-invitation-api-button" type="button">초대 수락 API 호출</button>
                                 </p>
                             </form>
-                            <p id="join-invitation-result" role="status" aria-live="polite"></p>
+                            <pre id="join-invitation-result" role="status" aria-live="polite"></pre>
+
+                            <hr>
+                            <h2>내 그룹 조회</h2>
+                            <p>그룹이 없을 때의 404와 그룹·멤버십·주소 정보를 확인합니다.</p>
+                            <button id="load-my-group-button" type="button">GET /api/groups/me</button>
+                            <pre id="my-group-result" role="status" aria-live="polite"></pre>
 
                             <hr>
                             <h2>그룹 생성 및 초대 링크 확인</h2>
-                            <p>발급 결과에서 APP_PUBLIC_BASE_URL 적용 여부를 확인할 수 있습니다.</p>
+                            <p>선택 주소와 생성 결과를 확인하고, 이미 그룹이 있다면 409 응답을 확인합니다.</p>
                             <form id="group-form">
                                 <p>
                                     <label for="group-name">그룹 이름</label><br>
-                                    <input id="group-name" name="name" type="text" maxlength="50" autocomplete="off" required>
+                                    <input id="group-name" name="name" type="text" maxlength="50"
+                                           autocomplete="off" required>
+                                </p>
+                                <p>
+                                    <label for="group-address">그룹 주소 (선택)</label><br>
+                                    <input id="group-address" name="address" type="text" maxlength="255"
+                                           autocomplete="street-address">
+                                </p>
+                                <p>
                                     <button id="create-group-button" type="submit">그룹 생성</button>
                                 </p>
                             </form>

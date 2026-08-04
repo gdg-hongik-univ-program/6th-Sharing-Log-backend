@@ -132,10 +132,14 @@ class LoginFlowTest {
                 .andExpect(content().string(containsString("Test User님, 로그인되었습니다.")))
                 .andExpect(content().string(containsString("test@example.com")))
                 .andExpect(content().string(containsString("id=\"group-form\"")))
+                .andExpect(content().string(containsString("id=\"group-address\"")))
                 .andExpect(content().string(containsString("id=\"create-group-button\"")))
                 .andExpect(content().string(containsString("id=\"join-invitation-form\"")))
                 .andExpect(content().string(containsString("id=\"join-invitation-input\"")))
+                .andExpect(content().string(containsString("id=\"accept-invitation-api-button\"")))
                 .andExpect(content().string(containsString("id=\"join-invitation-result\"")))
+                .andExpect(content().string(containsString("id=\"load-my-group-button\"")))
+                .andExpect(content().string(containsString("id=\"my-group-result\"")))
                 .andExpect(content().string(containsString("id=\"issue-invitation-button\"")))
                 .andExpect(content().string(containsString(
                         "<input id=\"invite-url\" type=\"text\" readonly>")))
@@ -163,7 +167,10 @@ class LoginFlowTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("/api/auth/csrf")))
                 .andExpect(content().string(containsString("/api/groups")))
+                .andExpect(content().string(containsString("/api/groups/me")))
+                .andExpect(content().string(containsString("/api/invitations/")))
                 .andExpect(content().string(containsString("/members")))
+                .andExpect(content().string(containsString("request.address = groupAddress")))
                 .andExpect(content().string(containsString(
                         "invitationUrl.origin !== window.location.origin")))
                 .andExpect(content().string(containsString(
