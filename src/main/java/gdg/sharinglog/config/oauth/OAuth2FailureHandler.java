@@ -17,10 +17,14 @@ import org.springframework.stereotype.Component;
 public class OAuth2FailureHandler extends SimpleUrlAuthenticationFailureHandler {
 
     public OAuth2FailureHandler(
-            @Value("${app.oauth2-failure-url:/?error=true}")
-            String failureUrl
+            @Value("${app.oauth2-failure-url:}") String failureUrl,
+            @Value("${app.frontend-origin}") String frontendOrigin
     ) {
-        setDefaultFailureUrl(failureUrl);
+        setDefaultFailureUrl(OAuth2RedirectTargetResolver.resolve(
+                failureUrl,
+                frontendOrigin,
+                "/?error=true"
+        ));
     }
 
     @Override

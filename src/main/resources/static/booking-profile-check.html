@@ -5,12 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>예약·프로필 API 임시 확인</title>
     <script src="/js/booking-profile-check.js" defer></script>
+    <script src="/js/logout.js" defer></script>
 </head>
 <body>
 <main>
     <h1>예약·프로필 API 임시 확인</h1>
     <p>로그인한 상태에서 백엔드 API를 직접 호출하는 디자인 없는 확인 화면입니다.</p>
-    <p><a href="/">홈으로</a></p>
+    <p>
+        <a href="/">홈으로</a>
+        <button id="logout-button" type="button" aria-describedby="logout-status">로그아웃</button>
+    </p>
+    <p id="logout-status" role="status" aria-live="polite"></p>
 
     <hr>
     <section aria-labelledby="profile-heading">

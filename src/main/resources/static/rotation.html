@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="/css/app.css">
     <script src="/js/rotation.js" defer></script>
     <script src="/js/booking-profile-check.js" defer></script>
+    <script src="/js/logout.js" defer></script>
 </head>
 <body class="rotation-page">
 <main class="rotation-shell">
@@ -34,8 +35,13 @@
                 로테이션 관리
             </button>
             <button id="open-create-chore" class="primary-button" type="button">업무 추가</button>
+            <button id="logout-button"
+                    class="danger-outline-button"
+                    type="button"
+                    aria-describedby="logout-status">로그아웃</button>
         </div>
     </header>
+    <p id="logout-status" class="rotation-status" role="status" aria-live="polite"></p>
 
     <nav class="rotation-tabs" aria-label="반복 주기">
         <button class="rotation-tab is-active" data-frequency="DAILY" type="button">매일</button>

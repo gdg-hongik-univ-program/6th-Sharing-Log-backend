@@ -20,8 +20,7 @@ import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(properties = {
-        "app.frontend-origin=https://6th-sharing-log-frontend-teal.vercel.app/",
-        "app.oauth2-failure-url=https://6th-sharing-log-frontend-teal.vercel.app/?error=true"
+        "app.frontend-origin=http://localhost:5173/"
 })
 @AutoConfigureMockMvc
 class LoginFlowTest {
@@ -62,7 +61,7 @@ class LoginFlowTest {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(header().string(
                         "Location",
-                        "https://6th-sharing-log-frontend-teal.vercel.app/?error=true"
+                        "http://localhost:5173/?error=true"
                 ));
     }
 
@@ -76,12 +75,12 @@ class LoginFlowTest {
     void allowsCredentialedRequestsFromFrontendOrigin() throws Exception {
         mockMvc.perform(options("/api/auth/csrf")
                         .header("Origin",
-                                "https://6th-sharing-log-frontend-teal.vercel.app")
+                                "http://localhost:5173")
                         .header("Access-Control-Request-Method", "GET"))
                 .andExpect(status().isOk())
                 .andExpect(header().string(
                         "Access-Control-Allow-Origin",
-                        "https://6th-sharing-log-frontend-teal.vercel.app"
+                        "http://localhost:5173"
                 ))
                 .andExpect(header().string(
                         "Access-Control-Allow-Credentials",
@@ -106,6 +105,23 @@ class LoginFlowTest {
     }
 
     @Test
+    void unauthenticatedApiRequestReturnsUnauthorizedWithoutLoginRedirect() throws Exception {
+        mockMvc.perform(get("/api/auth/me")
+                        .header("Origin",
+                                "http://localhost:5173"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().doesNotExist("Location"))
+                .andExpect(header().string(
+                        "Access-Control-Allow-Origin",
+                        "http://localhost:5173"
+                ))
+                .andExpect(header().string(
+                        "Access-Control-Allow-Credentials",
+                        "true"
+                ));
+    }
+
+    @Test
     void homeShowsAuthenticatedGoogleUser() throws Exception {
         mockMvc.perform(get("/").with(oauth2Login()
                         .attributes(attributes -> {
@@ -126,7 +142,9 @@ class LoginFlowTest {
                 .andExpect(content().string(containsString("id=\"invite-link\"")))
                 .andExpect(content().string(containsString("id=\"members-form\"")))
                 .andExpect(content().string(containsString("id=\"member-list-result\"")))
-                .andExpect(content().string(containsString("/js/group-setup.js")));
+                .andExpect(content().string(containsString("/js/group-setup.js")))
+                .andExpect(content().string(containsString("id=\"logout-button\"")))
+                .andExpect(content().string(containsString("/js/logout.js")));
     }
 
     @Test
@@ -134,7 +152,9 @@ class LoginFlowTest {
         mockMvc.perform(get("/"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.not(
-                        containsString("id=\"group-form\""))));
+                        containsString("id=\"group-form\""))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        containsString("id=\"logout-button\""))));
     }
 
     @Test
@@ -148,6 +168,30 @@ class LoginFlowTest {
                         "invitationUrl.origin !== window.location.origin")))
                 .andExpect(content().string(containsString(
                         "window.location.assign(`/invite/${encodeURIComponent(code)}`)")));
+    }
+
+    @Test
+    void authenticatedTemporaryPagesShowLogoutButton() throws Exception {
+        mockMvc.perform(get("/booking-profile-check.html").with(oauth2Login()))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("id=\"logout-button\"")))
+                .andExpect(content().string(containsString("/js/logout.js")));
+
+        mockMvc.perform(get("/rotation.html").with(oauth2Login()))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("id=\"logout-button\"")))
+                .andExpect(content().string(containsString("/js/logout.js")));
+    }
+
+    @Test
+    void logoutScriptPostsToApiAndRedirectsToLogin() throws Exception {
+        mockMvc.perform(get("/js/logout.js"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("/api/auth/logout")))
+                .andExpect(content().string(containsString("method: \"POST\"")))
+                .andExpect(content().string(containsString("credentials: \"include\"")))
+                .andExpect(content().string(containsString(
+                        "window.location.assign(\"/login\")")));
     }
 
     @Test

@@ -14,6 +14,9 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
+import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
+import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -56,6 +59,16 @@ public class WebOAuthSecurityConfig {
                         .successHandler(oAuth2SuccessHandler)
                         .failureHandler(oAuth2FailureHandler)
                 )
+                .exceptionHandling(exceptions -> exceptions
+                        .defaultAuthenticationEntryPointFor(
+                                new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED),
+                                WebOAuthSecurityConfig::isApiRequest
+                        )
+                        .defaultAuthenticationEntryPointFor(
+                                new LoginUrlAuthenticationEntryPoint("/login"),
+                                request -> !isApiRequest(request)
+                        ))
+                .requestCache(cache -> cache.requestCache(invitationRequestCache()))
 
                 // 해당 요청만 CSRF 예외 처리하고
                 // Spring Security 로그아웃 필터가 세션 무효화, 인증 정보 삭제, JSESSIONID 쿠키 삭제 후
@@ -70,6 +83,12 @@ public class WebOAuthSecurityConfig {
                                 response.setStatus(HttpStatus.NO_CONTENT.value()))
                 )
                 .build();
+    }
+
+    private static HttpSessionRequestCache invitationRequestCache() {
+        HttpSessionRequestCache requestCache = new HttpSessionRequestCache();
+        requestCache.setRequestMatcher(WebOAuthSecurityConfig::isInvitationPageRequest);
+        return requestCache;
     }
 
     @Bean
@@ -144,12 +163,27 @@ public class WebOAuthSecurityConfig {
     }
 
     private static boolean isApiLogoutRequest(jakarta.servlet.http.HttpServletRequest request) {
+        String path = requestPath(request);
+        return "POST".equals(request.getMethod()) && "/api/auth/logout".equals(path);
+    }
+
+    private static boolean isInvitationPageRequest(
+            jakarta.servlet.http.HttpServletRequest request
+    ) {
+        return "GET".equals(request.getMethod())
+                && requestPath(request).startsWith("/invite/");
+    }
+
+    private static boolean isApiRequest(jakarta.servlet.http.HttpServletRequest request) {
+        return requestPath(request).startsWith("/api/");
+    }
+
+    private static String requestPath(jakarta.servlet.http.HttpServletRequest request) {
         String path = request.getRequestURI();
         String contextPath = request.getContextPath();
         if (contextPath != null && !contextPath.isBlank() && path.startsWith(contextPath)) {
             path = path.substring(contextPath.length());
         }
-
-        return "POST".equals(request.getMethod()) && "/api/auth/logout".equals(path);
+        return path;
     }
 }

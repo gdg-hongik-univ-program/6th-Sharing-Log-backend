@@ -35,6 +35,7 @@ public class HomeController {
                     <title>Sharing Log</title>
                     <link rel="stylesheet" href="/css/app.css">
                     <script src="/js/group-setup.js" defer></script>
+                    <script src="/js/logout.js" defer></script>
                 </head>
                 <body>
                     <main class="shell">
@@ -95,7 +96,10 @@ public class HomeController {
                             </section>
 
                             <hr>
-                            <a class="secondary-link" href="/login">로그인 화면 보기</a>
+                            <button id="logout-button" type="button" aria-describedby="logout-status">
+                                로그아웃
+                            </button>
+                            <p id="logout-status" role="status" aria-live="polite"></p>
                         </section>
                     </main>
                 </body>
