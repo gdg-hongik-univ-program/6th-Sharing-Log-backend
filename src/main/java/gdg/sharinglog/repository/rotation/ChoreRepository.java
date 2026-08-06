@@ -21,6 +21,7 @@ public interface ChoreRepository extends JpaRepository<Chore, Long> {
             select chore
             from Chore chore
             where chore.active = true
+              and chore.group.deletedAt is null
             order by chore.group.id asc, chore.id asc
             """)
     List<Chore> findAllActiveForOccurrenceGeneration();

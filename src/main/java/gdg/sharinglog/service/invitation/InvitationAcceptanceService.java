@@ -69,7 +69,7 @@ public class InvitationAcceptanceService {
 
         SharingGroup group = sharingGroupRepository
                 .findByIdForUpdate(invitation.getGroup().getId())
-                .orElseThrow(() -> new IllegalStateException("초대의 그룹을 찾을 수 없습니다."));
+                .orElseThrow(InvitationUnavailableException::new);
         Optional<GroupMember> existingMembership = groupMemberRepository
                 .findByGroup_IdAndUser_Id(group.getId(), user.getId());
         Instant acceptedAt = Instant.now();

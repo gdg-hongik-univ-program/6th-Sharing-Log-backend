@@ -1,6 +1,7 @@
 package gdg.sharinglog.web;
 
 import java.net.URI;
+import java.time.Instant;
 
 import gdg.sharinglog.service.group.GroupMemberQueryService;
 import gdg.sharinglog.service.group.GroupService;
@@ -13,6 +14,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -68,5 +70,19 @@ public class GroupController {
                 authentication.getAuthorizedClientRegistrationId(),
                 authentication.getPrincipal()
         )));
+    }
+
+    @DeleteMapping("/{groupId}")
+    public ResponseEntity<Void> deleteGroup(
+            @PathVariable String groupId,
+            OAuth2AuthenticationToken authentication
+    ) {
+        groupService.deleteGroup(
+                groupId,
+                authentication.getAuthorizedClientRegistrationId(),
+                authentication.getPrincipal(),
+                Instant.now()
+        );
+        return ResponseEntity.noContent().build();
     }
 }
