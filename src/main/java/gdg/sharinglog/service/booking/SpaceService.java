@@ -54,6 +54,19 @@ public class SpaceService {
         return toResponse(space);
     }
 
+    @Transactional
+    public void deleteSpace(
+            String groupPublicId,
+            String spacePublicId,
+            String registrationId,
+            OAuth2User principal
+    ) {
+        accessService.requireActiveMember(groupPublicId, registrationId, principal);
+        spaceRepository
+                .findByPublicIdAndGroupPublicIdForUpdate(spacePublicId, groupPublicId)
+                .ifPresent(Space::deactivate);
+    }
+
     private static SpaceResponse toResponse(Space space) {
         return new SpaceResponse(space.getPublicId(), space.getName());
     }

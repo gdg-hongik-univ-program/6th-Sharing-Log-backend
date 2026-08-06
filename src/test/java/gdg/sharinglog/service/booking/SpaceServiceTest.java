@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
+import java.util.Optional;
 
 import gdg.sharinglog.domain.GroupMember;
 import gdg.sharinglog.domain.SharingGroup;
@@ -88,5 +89,40 @@ class SpaceServiceTest {
 
         assertEquals(1, response.items().size());
         assertEquals("공용 주방", response.items().get(0).name());
+    }
+
+    @Test
+    void deleteSpaceDeactivatesSpace() {
+        String groupPublicId = "grp-1";
+        String spacePublicId = "space-1";
+        OAuth2User principal = mock(OAuth2User.class);
+        SharingGroup group = mock(SharingGroup.class);
+        GroupMember membership = mock(GroupMember.class);
+        BookingActor actor = new BookingActor(group, membership);
+        Space space = mock(Space.class);
+
+        when(accessService.requireActiveMember(groupPublicId, "google", principal)).thenReturn(actor);
+        when(spaceRepository.findByPublicIdAndGroupPublicIdForUpdate(spacePublicId, groupPublicId))
+                .thenReturn(Optional.of(space));
+
+        service.deleteSpace(groupPublicId, spacePublicId, "google", principal);
+
+        verify(space).deactivate();
+    }
+
+    @Test
+    void deleteSpaceIsNoOpWhenSpaceMissing() {
+        String groupPublicId = "grp-1";
+        String spacePublicId = "space-1";
+        OAuth2User principal = mock(OAuth2User.class);
+        SharingGroup group = mock(SharingGroup.class);
+        GroupMember membership = mock(GroupMember.class);
+        BookingActor actor = new BookingActor(group, membership);
+
+        when(accessService.requireActiveMember(groupPublicId, "google", principal)).thenReturn(actor);
+        when(spaceRepository.findByPublicIdAndGroupPublicIdForUpdate(spacePublicId, groupPublicId))
+                .thenReturn(Optional.empty());
+
+        service.deleteSpace(groupPublicId, spacePublicId, "google", principal);
     }
 }

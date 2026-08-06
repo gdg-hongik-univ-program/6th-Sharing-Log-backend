@@ -73,4 +73,8 @@ public class Space {
         }
         return name.trim();
     }
+
+    public void deactivate() {
+        this.active = false;
+    }
 }
