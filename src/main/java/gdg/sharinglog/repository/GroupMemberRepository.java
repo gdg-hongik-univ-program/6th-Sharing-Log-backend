@@ -53,6 +53,12 @@ public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> 
             GroupRole role
     );
 
+    boolean existsByGroup_IdAndStatusAndIdNot(
+            Long groupId,
+            MemberStatus status,
+            Long id
+    );
+
     @Query("select member.group.id from GroupMember member where member.publicId = :publicId")
     Optional<Long> findGroupIdByPublicId(@Param("publicId") String publicId);
 

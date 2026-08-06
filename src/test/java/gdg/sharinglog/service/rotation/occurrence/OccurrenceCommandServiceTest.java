@@ -348,7 +348,7 @@ class OccurrenceCommandServiceTest {
     }
 
     @Test
-    void lastOwnerCannotLeaveGroup() {
+    void lastOwnerCannotLeaveWhenAnotherActiveMemberRemains() {
         Context context = context("last-owner");
         GroupMember owner = context.members().getFirst();
 
@@ -358,6 +358,22 @@ class OccurrenceCommandServiceTest {
         );
 
         assertEquals(MemberStatus.ACTIVE, owner.getStatus());
+    }
+
+    @Test
+    void soleOwnerCanLeaveGroup() {
+        User owner = userRepository.save(user("sole-owner"));
+        SharingGroup group = groupRepository.save(new SharingGroup("혼자 사는 집", owner));
+        GroupMember membership = groupMemberRepository.save(GroupMember.owner(group, owner));
+
+        List<ChoreOccurrence> affected = commandService.leaveMember(
+                membership.getPublicId(),
+                ACTION_AT
+        );
+
+        assertTrue(affected.isEmpty());
+        assertEquals(MemberStatus.LEFT, membership.getStatus());
+        assertEquals(ACTION_AT, membership.getLeftAt());
     }
 
     @Test

@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oauth2Login;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -208,6 +209,54 @@ class GroupCreationApiTest {
 
         assertEquals(1, groupRepository.count());
         assertEquals(1, groupMemberRepository.count());
+    }
+
+    @Test
+    void ownerUpdatesGroupNameAndAddress() throws Exception {
+        SharingGroup group = groupRepository.save(new SharingGroup("기존 집", creator));
+        groupMemberRepository.save(GroupMember.owner(group, creator));
+
+        mockMvc.perform(patch("/api/groups/{groupId}", group.getPublicId())
+                        .with(csrf())
+                        .with(oauth2Login()
+                                .clientRegistration(googleClientRegistration())
+                                .attributes(attributes -> attributes.put("sub", GOOGLE_USER_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"  새로운 집  ","address":"  부산시 해운대구  "}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.groupPublicId").value(group.getPublicId()))
+                .andExpect(jsonPath("$.name").value("새로운 집"))
+                .andExpect(jsonPath("$.address").value("부산시 해운대구"));
+
+        SharingGroup updated = groupRepository.findById(group.getId()).orElseThrow();
+        assertEquals("새로운 집", updated.getName());
+        assertEquals("부산시 해운대구", updated.getAddress());
+    }
+
+    @Test
+    void regularMemberCannotUpdateGroup() throws Exception {
+        User owner = userRepository.save(User.builder()
+                .provider(OAuthProvider.GOOGLE)
+                .providerUserId("group-update-owner-id")
+                .build());
+        SharingGroup group = groupRepository.save(new SharingGroup("기존 집", owner));
+        groupMemberRepository.save(GroupMember.owner(group, owner));
+        groupMemberRepository.save(GroupMember.member(group, creator));
+
+        mockMvc.perform(patch("/api/groups/{groupId}", group.getPublicId())
+                        .with(csrf())
+                        .with(oauth2Login()
+                                .clientRegistration(googleClientRegistration())
+                                .attributes(attributes -> attributes.put("sub", GOOGLE_USER_ID)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"권한 없는 변경"}
+                                """))
+                .andExpect(status().isForbidden());
+
+        assertEquals("기존 집", groupRepository.findById(group.getId()).orElseThrow().getName());
     }
 
     private ClientRegistration googleClientRegistration() {

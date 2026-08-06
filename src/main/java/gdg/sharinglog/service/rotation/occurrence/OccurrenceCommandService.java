@@ -225,7 +225,12 @@ public class OccurrenceCommandService {
                         groupId,
                         MemberStatus.ACTIVE,
                         GroupRole.OWNER
-                ) <= 1) {
+                ) <= 1
+                && groupMemberRepository.existsByGroup_IdAndStatusAndIdNot(
+                        groupId,
+                        MemberStatus.ACTIVE,
+                        member.getId()
+                )) {
             throw new LastOwnerCannotLeaveException();
         }
 

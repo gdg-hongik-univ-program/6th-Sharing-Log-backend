@@ -1,13 +1,17 @@
 package gdg.sharinglog.service.group;
 
 import gdg.sharinglog.domain.GroupMember;
+import gdg.sharinglog.domain.GroupRole;
 import gdg.sharinglog.domain.MemberStatus;
 import gdg.sharinglog.domain.SharingGroup;
 import gdg.sharinglog.domain.User;
 import gdg.sharinglog.repository.GroupMemberRepository;
 import gdg.sharinglog.repository.SharingGroupRepository;
 import gdg.sharinglog.service.group.exception.AlreadyInAnotherGroupException;
+import gdg.sharinglog.service.group.exception.GroupMemberAccessDeniedException;
+import gdg.sharinglog.service.group.exception.GroupNotFoundException;
 import gdg.sharinglog.service.group.result.CreatedGroup;
+import gdg.sharinglog.service.group.result.UpdatedGroup;
 import gdg.sharinglog.service.user.AuthenticatedUserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.core.user.OAuth2User;
@@ -51,6 +55,50 @@ public class GroupService {
                 ownerMembership.getPublicId(),
                 ownerMembership.getRole(),
                 group.getCreatedAt()
+        );
+    }
+
+    @Transactional
+    public UpdatedGroup updateGroup(
+            String groupPublicId,
+            String requestedName,
+            String requestedAddress,
+            String registrationId,
+            OAuth2User oAuth2User
+    ) {
+        if (requestedName == null && requestedAddress == null) {
+            throw new IllegalArgumentException("그룹 이름 또는 주소 중 하나 이상을 입력해 주세요.");
+        }
+
+        User requester = authenticatedUserService.requireUserForUpdate(registrationId, oAuth2User);
+        SharingGroup group = groupRepository.findByPublicIdForUpdate(groupPublicId)
+                .orElseThrow(() -> new GroupNotFoundException(groupPublicId));
+        GroupMember membership = groupMemberRepository
+                .findByGroup_IdAndUser_IdAndStatus(
+                        group.getId(),
+                        requester.getId(),
+                        MemberStatus.ACTIVE
+                )
+                .orElseThrow(() -> new GroupMemberAccessDeniedException(
+                        "활성 그룹 멤버만 그룹 정보를 수정할 수 있습니다."
+                ));
+        if (membership.getRole() != GroupRole.OWNER) {
+            throw new GroupMemberAccessDeniedException(
+                    "그룹 OWNER만 그룹 정보를 수정할 수 있습니다."
+            );
+        }
+
+        if (requestedName != null) {
+            group.updateName(normalizeGroupName(requestedName));
+        }
+        if (requestedAddress != null) {
+            group.updateAddress(requestedAddress);
+        }
+
+        return new UpdatedGroup(
+                group.getPublicId(),
+                group.getName(),
+                group.getAddress()
         );
     }
 

@@ -81,6 +81,10 @@ public class SharingGroup {
         this.weekStartsOn = Objects.requireNonNull(weekStartsOn, "주 시작 요일은 필수입니다.");
     }
 
+    public void updateName(String name) {
+        this.name = Objects.requireNonNull(name, "그룹 이름은 필수입니다.");
+    }
+
     public void updateAddress(String address) {
         this.address = address == null || address.isBlank() ? null : address.trim();
     }
