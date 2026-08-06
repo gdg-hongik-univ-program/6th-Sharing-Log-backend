@@ -12,7 +12,6 @@ import gdg.sharinglog.domain.User;
 import gdg.sharinglog.repository.GroupInvitationRepository;
 import gdg.sharinglog.repository.GroupMemberRepository;
 import gdg.sharinglog.repository.SharingGroupRepository;
-import gdg.sharinglog.service.group.exception.AlreadyInAnotherGroupException;
 import gdg.sharinglog.service.group.exception.GroupMemberAccessDeniedException;
 import gdg.sharinglog.service.group.exception.GroupDeletionConflictException;
 import gdg.sharinglog.service.group.exception.GroupNotFoundException;
@@ -45,10 +44,7 @@ public class GroupService {
             OAuth2User oAuth2User
     ) {
         String groupName = normalizeGroupName(requestedName);
-        User creator = authenticatedUserService.requireUserForUpdate(registrationId, oAuth2User);
-        if (groupMemberRepository.existsByUser_IdAndStatus(creator.getId(), MemberStatus.ACTIVE)) {
-            throw new AlreadyInAnotherGroupException();
-        }
+        User creator = authenticatedUserService.requireUser(registrationId, oAuth2User);
 
         SharingGroup group = new SharingGroup(groupName, creator);
         group.updateAddress(requestedAddress);

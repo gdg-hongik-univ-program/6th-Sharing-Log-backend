@@ -2,6 +2,7 @@ package gdg.sharinglog.web;
 
 import java.net.URI;
 import java.time.Instant;
+import java.util.List;
 
 import gdg.sharinglog.service.group.GroupMemberQueryService;
 import gdg.sharinglog.service.group.GroupService;
@@ -47,14 +48,14 @@ public class GroupController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<MyGroupResponse> myGroup(OAuth2AuthenticationToken authentication) {
-        return groupMemberQueryService.findMyGroup(
+    public List<MyGroupResponse> myGroups(OAuth2AuthenticationToken authentication) {
+        return groupMemberQueryService.findMyGroups(
                         authentication.getAuthorizedClientRegistrationId(),
                         authentication.getPrincipal()
                 )
+                .stream()
                 .map(MyGroupResponse::from)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+                .toList();
     }
 
     @PatchMapping("/{groupId}")

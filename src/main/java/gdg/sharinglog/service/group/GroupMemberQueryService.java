@@ -3,8 +3,6 @@ package gdg.sharinglog.service.group;
 import java.util.Comparator;
 import java.util.List;
 
-import java.util.Optional;
-
 import gdg.sharinglog.domain.GroupMember;
 import gdg.sharinglog.domain.GroupRole;
 import gdg.sharinglog.domain.MemberStatus;
@@ -64,10 +62,11 @@ public class GroupMemberQueryService {
     }
 
     @Transactional(readOnly = true)
-    public Optional<MyGroup> findMyGroup(String registrationId, OAuth2User oAuth2User) {
+    public List<MyGroup> findMyGroups(String registrationId, OAuth2User oAuth2User) {
         User user = authenticatedUserService.requireUser(registrationId, oAuth2User);
         return groupMemberRepository
-                .findByUser_IdAndStatus(user.getId(), MemberStatus.ACTIVE)
+                .findAllByUser_IdAndStatus(user.getId(), MemberStatus.ACTIVE)
+                .stream()
                 .map(membership -> new MyGroup(
                         membership.getGroup().getPublicId(),
                         membership.getPublicId(),
@@ -75,7 +74,8 @@ public class GroupMemberQueryService {
                         membership.getGroup().getName(),
                         membership.getGroup().getAddress(),
                         membership.getRole()
-                ));
+                ))
+                .toList();
     }
 
     private GroupMembers.Member toMember(GroupMember membership, Long requesterId) {
