@@ -187,7 +187,7 @@ class GroupCreationApiTest {
     }
 
     @Test
-    void rejectsCreatingASecondGroupWhileActiveInAnother() throws Exception {
+    void allowsCreatingASecondGroupWhileActiveInAnother() throws Exception {
         mockMvc.perform(post("/api/groups")
                         .with(csrf())
                         .with(oauth2Login()
@@ -208,10 +208,10 @@ class GroupCreationApiTest {
                         .content("""
                                 {"name":"두 번째 집"}
                                 """))
-                .andExpect(status().isConflict());
+                .andExpect(status().isCreated());
 
-        assertEquals(1, groupRepository.count());
-        assertEquals(1, groupMemberRepository.count());
+        assertEquals(2, groupRepository.count());
+        assertEquals(2, groupMemberRepository.count());
     }
 
     @Test

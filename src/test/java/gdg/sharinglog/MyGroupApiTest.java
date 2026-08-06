@@ -65,21 +65,38 @@ class MyGroupApiTest {
                                 .clientRegistration(googleClientRegistration())
                                 .attributes(attributes -> attributes.put("sub", GOOGLE_USER_ID))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.groupPublicId").value(group.getPublicId()))
-                .andExpect(jsonPath("$.membershipPublicId").value(membership.getPublicId()))
-                .andExpect(jsonPath("$.membershipVersion").value(membership.getVersion()))
-                .andExpect(jsonPath("$.groupName").value("우리 집"))
-                .andExpect(jsonPath("$.groupAddress").value("서울시 강남구 역삼동"))
-                .andExpect(jsonPath("$.role").value("OWNER"));
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].groupPublicId").value(group.getPublicId()))
+                .andExpect(jsonPath("$[0].membershipPublicId").value(membership.getPublicId()))
+                .andExpect(jsonPath("$[0].membershipVersion").value(membership.getVersion()))
+                .andExpect(jsonPath("$[0].groupName").value("우리 집"))
+                .andExpect(jsonPath("$[0].groupAddress").value("서울시 강남구 역삼동"))
+                .andExpect(jsonPath("$[0].role").value("OWNER"));
     }
 
     @Test
-    void returnsNotFoundWhenUserHasNoActiveGroup() throws Exception {
+    void returnsEmptyListWhenUserHasNoActiveGroup() throws Exception {
         mockMvc.perform(get("/api/groups/me")
                         .with(oauth2Login()
                                 .clientRegistration(googleClientRegistration())
                                 .attributes(attributes -> attributes.put("sub", GOOGLE_USER_ID))))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void returnsAllGroupsWhenUserBelongsToSeveral() throws Exception {
+        SharingGroup firstGroup = groupRepository.save(new SharingGroup("첫 번째 집", user));
+        groupMemberRepository.save(GroupMember.owner(firstGroup, user));
+        SharingGroup secondGroup = groupRepository.save(new SharingGroup("두 번째 집", user));
+        groupMemberRepository.save(GroupMember.owner(secondGroup, user));
+
+        mockMvc.perform(get("/api/groups/me")
+                        .with(oauth2Login()
+                                .clientRegistration(googleClientRegistration())
+                                .attributes(attributes -> attributes.put("sub", GOOGLE_USER_ID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
     }
 
     @Test
