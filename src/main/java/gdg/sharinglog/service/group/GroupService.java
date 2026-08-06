@@ -1,17 +1,24 @@
 package gdg.sharinglog.service.group;
 
+import java.time.Instant;
+import java.util.Objects;
+
 import gdg.sharinglog.domain.GroupMember;
+import gdg.sharinglog.domain.GroupInvitation;
 import gdg.sharinglog.domain.GroupRole;
 import gdg.sharinglog.domain.MemberStatus;
 import gdg.sharinglog.domain.SharingGroup;
 import gdg.sharinglog.domain.User;
+import gdg.sharinglog.repository.GroupInvitationRepository;
 import gdg.sharinglog.repository.GroupMemberRepository;
 import gdg.sharinglog.repository.SharingGroupRepository;
 import gdg.sharinglog.service.group.exception.AlreadyInAnotherGroupException;
 import gdg.sharinglog.service.group.exception.GroupMemberAccessDeniedException;
+import gdg.sharinglog.service.group.exception.GroupDeletionConflictException;
 import gdg.sharinglog.service.group.exception.GroupNotFoundException;
 import gdg.sharinglog.service.group.result.CreatedGroup;
 import gdg.sharinglog.service.group.result.UpdatedGroup;
+import gdg.sharinglog.service.rotation.occurrence.OccurrenceCommandService;
 import gdg.sharinglog.service.user.AuthenticatedUserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.core.user.OAuth2User;
@@ -25,8 +32,10 @@ public class GroupService {
     private static final int MAX_GROUP_NAME_LENGTH = 50;
 
     private final SharingGroupRepository groupRepository;
+    private final GroupInvitationRepository groupInvitationRepository;
     private final GroupMemberRepository groupMemberRepository;
     private final AuthenticatedUserService authenticatedUserService;
+    private final OccurrenceCommandService occurrenceCommandService;
 
     @Transactional
     public CreatedGroup createGroup(
@@ -100,6 +109,48 @@ public class GroupService {
                 group.getName(),
                 group.getAddress()
         );
+    }
+
+    @Transactional
+    public void deleteGroup(
+            String groupPublicId,
+            String registrationId,
+            OAuth2User oAuth2User,
+            Instant deletedAt
+    ) {
+        User requester = authenticatedUserService.requireUserForUpdate(registrationId, oAuth2User);
+        SharingGroup group = groupRepository.findByPublicIdForUpdate(groupPublicId)
+                .orElseThrow(() -> new GroupNotFoundException(groupPublicId));
+        GroupMember membership = groupMemberRepository
+                .findByGroup_IdAndUser_IdAndStatus(
+                        group.getId(),
+                        requester.getId(),
+                        MemberStatus.ACTIVE
+                )
+                .orElseThrow(() -> new GroupMemberAccessDeniedException(
+                        "활성 그룹 멤버만 그룹을 삭제할 수 있습니다."
+                ));
+        if (membership.getRole() != GroupRole.OWNER) {
+            throw new GroupMemberAccessDeniedException(
+                    "그룹 OWNER만 그룹을 삭제할 수 있습니다."
+            );
+        }
+        if (groupMemberRepository.existsByGroup_IdAndStatusAndIdNot(
+                group.getId(),
+                MemberStatus.ACTIVE,
+                membership.getId()
+        )) {
+            throw new GroupDeletionConflictException();
+        }
+
+        Instant effectiveDeletedAt = Objects.requireNonNull(deletedAt, "그룹 삭제 시각은 필수입니다.");
+        occurrenceCommandService.leaveMember(membership.getPublicId(), effectiveDeletedAt);
+        for (GroupInvitation invitation : groupInvitationRepository.findAllByGroup_Id(group.getId())) {
+            if (invitation.getRevokedAt() == null) {
+                invitation.revoke(effectiveDeletedAt);
+            }
+        }
+        group.delete(effectiveDeletedAt);
     }
 
     private String normalizeGroupName(String requestedName) {

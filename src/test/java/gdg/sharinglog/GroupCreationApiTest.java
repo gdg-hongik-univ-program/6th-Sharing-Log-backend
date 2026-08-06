@@ -3,10 +3,12 @@ package gdg.sharinglog;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oauth2Login;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -15,6 +17,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import gdg.sharinglog.domain.GroupMember;
 import gdg.sharinglog.domain.GroupRole;
+import gdg.sharinglog.domain.MemberStatus;
 import gdg.sharinglog.domain.OAuthProvider;
 import gdg.sharinglog.domain.SharingGroup;
 import gdg.sharinglog.domain.User;
@@ -257,6 +260,64 @@ class GroupCreationApiTest {
                 .andExpect(status().isForbidden());
 
         assertEquals("기존 집", groupRepository.findById(group.getId()).orElseThrow().getName());
+    }
+
+    @Test
+    void soleOwnerDeletesGroup() throws Exception {
+        SharingGroup group = groupRepository.save(new SharingGroup("삭제할 집", creator));
+        GroupMember ownerMembership = groupMemberRepository.save(GroupMember.owner(group, creator));
+
+        mockMvc.perform(delete("/api/groups/{groupId}", group.getPublicId())
+                        .with(csrf())
+                        .with(oauth2Login()
+                                .clientRegistration(googleClientRegistration())
+                                .attributes(attributes -> attributes.put("sub", GOOGLE_USER_ID))))
+                .andExpect(status().isNoContent());
+
+        assertNotNull(group.getDeletedAt());
+        assertEquals(MemberStatus.LEFT, ownerMembership.getStatus());
+        assertTrue(groupRepository.findByPublicId(group.getPublicId()).isEmpty());
+        assertEquals(1, groupRepository.count());
+    }
+
+    @Test
+    void ownerCannotDeleteGroupWhenAnotherActiveMemberRemains() throws Exception {
+        SharingGroup group = groupRepository.save(new SharingGroup("함께 사는 집", creator));
+        groupMemberRepository.save(GroupMember.owner(group, creator));
+        User member = userRepository.save(User.builder()
+                .provider(OAuthProvider.GOOGLE)
+                .providerUserId("group-delete-member-id")
+                .build());
+        groupMemberRepository.save(GroupMember.member(group, member));
+
+        mockMvc.perform(delete("/api/groups/{groupId}", group.getPublicId())
+                        .with(csrf())
+                        .with(oauth2Login()
+                                .clientRegistration(googleClientRegistration())
+                                .attributes(attributes -> attributes.put("sub", GOOGLE_USER_ID))))
+                .andExpect(status().isConflict());
+
+        assertNull(group.getDeletedAt());
+    }
+
+    @Test
+    void regularMemberCannotDeleteGroup() throws Exception {
+        User owner = userRepository.save(User.builder()
+                .provider(OAuthProvider.GOOGLE)
+                .providerUserId("group-delete-owner-id")
+                .build());
+        SharingGroup group = groupRepository.save(new SharingGroup("멤버가 있는 집", owner));
+        groupMemberRepository.save(GroupMember.owner(group, owner));
+        groupMemberRepository.save(GroupMember.member(group, creator));
+
+        mockMvc.perform(delete("/api/groups/{groupId}", group.getPublicId())
+                        .with(csrf())
+                        .with(oauth2Login()
+                                .clientRegistration(googleClientRegistration())
+                                .attributes(attributes -> attributes.put("sub", GOOGLE_USER_ID))))
+                .andExpect(status().isForbidden());
+
+        assertNull(group.getDeletedAt());
     }
 
     private ClientRegistration googleClientRegistration() {

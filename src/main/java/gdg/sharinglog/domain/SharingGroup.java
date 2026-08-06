@@ -56,6 +56,9 @@ public class SharingGroup {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
     @Column(name = "time_zone_id", nullable = false, length = 40)
     private String timeZoneId;
 
@@ -87,5 +90,12 @@ public class SharingGroup {
 
     public void updateAddress(String address) {
         this.address = address == null || address.isBlank() ? null : address.trim();
+    }
+
+    public void delete(Instant deletedAt) {
+        if (this.deletedAt != null) {
+            throw new IllegalStateException("이미 삭제된 그룹입니다.");
+        }
+        this.deletedAt = Objects.requireNonNull(deletedAt, "그룹 삭제 시각은 필수입니다.");
     }
 }
