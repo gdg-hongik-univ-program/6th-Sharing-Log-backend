@@ -28,6 +28,29 @@ CERTBOT_EMAIL=<인증서 만료 알림을 받을 이메일>
 - Let’s Encrypt는 짧은 기간에 반복 발급하면 제한될 수 있으므로, 배포 실패를 반복하지
   않는다.
 
+### 배포 파일 생성
+
+JAR 파일만 업로드하면 `.platform`의 Nginx와 Certbot 훅이 포함되지 않는다. 항상
+다음 작업으로 Elastic Beanstalk 소스 번들을 생성한다.
+
+```powershell
+$env:JAVA_HOME='C:\Users\SAMSUNG\.jdks\corretto-26.0.1'
+.\gradlew.bat clean ebBundle
+```
+
+생성 파일은 `build/distributions/sharingLog-0.0.1-SNAPSHOT-eb.zip`이다. ZIP 내부에는
+다음 항목이 루트 기준으로 함께 있어야 한다.
+
+```text
+application.jar
+.platform/hooks/postdeploy/50-configure-certbot.sh
+.platform/confighooks/postdeploy/50-configure-certbot.sh
+.platform/scripts/configure-certbot.sh
+.platform/nginx/conf.d/elasticbeanstalk/00-acme-challenge.conf
+```
+
+Elastic Beanstalk 콘솔에는 `build/libs/*.jar`가 아니라 이 ZIP을 업로드한다.
+
 ## 1. HTTPS 준비
 
 1. Elastic Beanstalk 환경과 같은 리전의 AWS Certificate Manager에서

@@ -7,11 +7,15 @@ import gdg.sharinglog.service.group.GroupService;
 import gdg.sharinglog.web.dto.CreateGroupRequest;
 import gdg.sharinglog.web.dto.GroupResponse;
 import gdg.sharinglog.web.dto.MyGroupResponse;
+import gdg.sharinglog.web.dto.UpdateGroupRequest;
+import gdg.sharinglog.web.dto.UpdateGroupResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -49,5 +53,20 @@ public class GroupController {
                 .map(MyGroupResponse::from)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @PatchMapping("/{groupId}")
+    public ResponseEntity<UpdateGroupResponse> updateGroup(
+            @PathVariable String groupId,
+            @Valid @RequestBody UpdateGroupRequest request,
+            OAuth2AuthenticationToken authentication
+    ) {
+        return ResponseEntity.ok(UpdateGroupResponse.from(groupService.updateGroup(
+                groupId,
+                request.name(),
+                request.address(),
+                authentication.getAuthorizedClientRegistrationId(),
+                authentication.getPrincipal()
+        )));
     }
 }

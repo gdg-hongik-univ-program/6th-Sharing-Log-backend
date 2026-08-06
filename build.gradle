@@ -48,3 +48,51 @@ dependencies {
 tasks.named('test') {
     useJUnitPlatform()
 }
+
+def bootJarTask = tasks.named('bootJar')
+
+tasks.register('ebBundle', Zip) {
+    group = 'distribution'
+    description = 'Builds an Elastic Beanstalk source bundle with application.jar and .platform hooks.'
+    dependsOn bootJarTask
+
+    archiveFileName = "${project.name}-${project.version}-eb.zip"
+    destinationDirectory = layout.buildDirectory.dir('distributions')
+    duplicatesStrategy = DuplicatesStrategy.FAIL
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+
+    from(bootJarTask.flatMap { it.archiveFile }) {
+        rename { 'application.jar' }
+    }
+
+    from(layout.projectDirectory.dir('.platform')) {
+        into '.platform'
+    }
+
+    doLast {
+        def bundleFile = archiveFile.get().asFile
+        def entries = [] as Set
+
+        project.zipTree(bundleFile).visit { details ->
+            if (!details.directory) {
+                entries << details.relativePath.pathString
+            }
+        }
+
+        def requiredEntries = [
+                'application.jar',
+                '.platform/hooks/postdeploy/50-configure-certbot.sh',
+                '.platform/confighooks/postdeploy/50-configure-certbot.sh',
+                '.platform/scripts/configure-certbot.sh',
+                '.platform/nginx/conf.d/elasticbeanstalk/00-acme-challenge.conf'
+        ]
+        def missingEntries = requiredEntries.findAll { !entries.contains(it) }
+
+        if (!missingEntries.isEmpty()) {
+            throw new GradleException("Elastic Beanstalk bundle is missing: ${missingEntries.join(', ')}")
+        }
+
+        logger.lifecycle("Elastic Beanstalk bundle verified: ${bundleFile}")
+    }
+}

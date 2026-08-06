@@ -1018,7 +1018,7 @@ ETag: "3"
 
 멤버 상태 전환과 모든 대상 회차 재배정은 한 트랜잭션으로 처리한다. 중간에 버전 충돌이 발생하면 전체를 롤백하고 `409 VERSION_CONFLICT`를 반환한다.
 
-이미 탈퇴한 멤버를 새 멱등 키로 다시 탈퇴시키면 `409 MEMBER_ALREADY_LEFT`다. 최초 요청과 같은 멱등 키 재전송은 최초 `200` 응답을 재생한다. 유일한 `OWNER`의 탈퇴 등 기존 그룹 정책상 허용되지 않는 경우 `409 LAST_OWNER_CANNOT_LEAVE`를 반환한다.
+이미 탈퇴한 멤버를 새 멱등 키로 다시 탈퇴시키면 `409 MEMBER_ALREADY_LEFT`다. 최초 요청과 같은 멱등 키 재전송은 최초 `200` 응답을 재생한다. 활성 멤버가 유일한 `OWNER` 본인뿐이면 탈퇴할 수 있다. 다른 활성 멤버가 남아 있는데 유일한 `OWNER`가 탈퇴하려는 경우에는 `409 LAST_OWNER_CANNOT_LEAVE`를 반환한다.
 
 ## 11. 상태 코드와 오류 코드
 
@@ -1039,7 +1039,7 @@ ETag: "3"
 | `409` | `NO_SUBSTITUTE_CANDIDATE` | 대타 요청을 받을 활성 가능 멤버가 없음 |
 | `409` | `IDEMPOTENCY_KEY_REUSED` | 같은 키를 다른 요청에 재사용 |
 | `409` | `MEMBER_ALREADY_LEFT` | 이미 탈퇴한 멤버에 대한 새 탈퇴 명령 |
-| `409` | `LAST_OWNER_CANNOT_LEAVE` | 그룹 소유권 정책 위반 |
+| `409` | `LAST_OWNER_CANNOT_LEAVE` | 다른 활성 멤버가 남은 그룹의 유일한 OWNER 탈퇴 |
 | `428` | `PRECONDITION_REQUIRED` | 기존 리소스 변경 요청에 `If-Match` 누락 |
 
 후보가 없거나 재시도 후에도 배정되지 않은 상황은 `409`가 아니다. 회차 상태와 `outcome`으로 표현한다.
