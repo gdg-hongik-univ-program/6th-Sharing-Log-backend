@@ -25,6 +25,52 @@ git fetch upstream
 git merge upstream/develop
 git stash pop # 임시 저장한 것 꺼내기
 
+
+#### 프론트와의 연결 관련
+
+8/8 BS 환경변수
+APP_FRONTEND_ORIGIN = http://localhost:5173
+
+APP_OAUTH2_FAILURE_URL = http://localhost:5173/?error=true
+APP_OAUTH2_SUCCESS_URL = http://localhost:5173/
+APP_PUBLIC_BASE_URL = 	
+http://localhost:5173
+SERVER_PORT = 5000
+
+SESSION_COOKIE_SAME_SITE = none
+SESSION_COOKIE_SECURE = true
+
+
+상대방 프론트는 API 요청에 credentials: "include"를 사용해야 합니다.
+------------------------------------------------------------------------------------
+백엔드에서 한 것 / 확인할 것
+EB 공개 백엔드를 HTTPS로 열었습니다.
+https://sharinglog-43-200-12-73.sslip.io
+
+Nginx → Spring Boot 프록시에 X-Forwarded-Proto: https를 전달해, 네이버 OAuth 콜백 URL이 HTTPS로 만들어지게 했습니다.
+
+실제 OAuth 시작 요청에서 아래가 확인됐습니다.
+JSESSIONID에 Secure; HttpOnly; SameSite=None
+네이버 콜백 URL이
+https://sharinglog-43-200-12-73.sslip.io/login/oauth2/code/naver
+
+
+
+프론트 담당자가 할 것
+VITE_BACKEND_ORIGIN=https://sharinglog-43-200-12-73.sslip.io
+Vite는 반드시 http://localhost:5173에서 실행해야 합니다. 포트가 달라지면 백엔드 CORS 허용 Origin과 불일치합니다.
+로그인 버튼은 API 호출이 아니라 브라우저 페이지 이동으로 실행합니다.
+window.location.href =
+`${import.meta.env.VITE_BACKEND_ORIGIN}/oauth2/authorization/naver`;
+로그인 후 인증이 필요한 API 요청에는 반드시 쿠키를 포함합니다.
+fetch(`${import.meta.env.VITE_BACKEND_ORIGIN}/api/auth/me`, {
+credentials: 'include',
+});
+프론트에 네이버 Callback URL을 만들거나 localhost:5173/login/oauth2/code/naver를 등록할 필요는 없습니다.
+JSESSIONID는 프론트가 직접 저장·설정하지 않습니다. 브라우저가 처리합니다.
+
+
+
 ## Google 로그인 실행 방법
   
 Google Cloud Console에서 OAuth 2.0 Client ID를 만들고 승인된 리디렉션 URI에 아래 주소를 등록합니다.
