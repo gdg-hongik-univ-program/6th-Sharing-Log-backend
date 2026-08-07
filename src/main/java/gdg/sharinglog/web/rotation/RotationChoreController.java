@@ -207,7 +207,13 @@ public class RotationChoreController {
                         request.schedule().weeklyDueDay(),
                         request.schedule().biweeklyAnchorDate()
                 );
-        return new UpdateChoreCommand(request.name(), schedule);
+        UpdateChoreCommand.Eligibility eligibility = request.eligibility() == null
+                ? null
+                : new UpdateChoreCommand.Eligibility(
+                        request.eligibility().mode(),
+                        request.eligibility().membershipIds()
+                );
+        return new UpdateChoreCommand(request.name(), schedule, eligibility);
     }
 
     private Boolean parseActive(String value) {

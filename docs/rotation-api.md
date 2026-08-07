@@ -421,7 +421,7 @@ API는 사용자 계정 ID나 이메일 대신 그룹 멤버십의 공개 UUID�
 |---|---|---|---|
 | `POST` | `/api/groups/{groupId}/chores` | 업무 생성 및 현재 회차 최초 배정 | `201` |
 | `GET` | `/api/groups/{groupId}/chores` | 업무 목록 | `200` |
-| `PATCH` | `/api/groups/{groupId}/chores/{choreId}` | 업무명·주기·마감일 수정 | `200` |
+| `PATCH` | `/api/groups/{groupId}/chores/{choreId}` | 업무명·주기·마감일·가능 멤버 수정 | `200` |
 | `DELETE` | `/api/groups/{groupId}/chores/{choreId}` | 업무 비활성화 | `204` |
 | `GET` | `/api/groups/{groupId}/occurrences` | 주기·기간·상태별 회차 목록 | `200` |
 | `GET` | `/api/groups/{groupId}/occurrences/completed-history` | 전체 또는 내 완료 업무 이력 | `200` |
@@ -593,13 +593,21 @@ If-Match: "3"
     "dueTime": "19:00:00",
     "weeklyDueDay": "SATURDAY",
     "biweeklyAnchorDate": null
+  },
+  "eligibility": {
+    "mode": "SELECTED_MEMBERS",
+    "membershipIds": [
+      "44444444-4444-4444-8444-444444444444",
+      "55555555-5555-4555-8555-555555555555"
+    ]
   }
 }
 ```
 
-- `name`, `schedule` 중 하나 이상을 보낸다.
+- `name`, `schedule`, `eligibility` 중 하나 이상을 보낸다.
 - `schedule`을 보내면 주기별 스케줄 객체 전체를 보낸다.
-- 가능 멤버는 멤버별 참여 업무 일괄 변경 API로 변경한다.
+- `eligibility`를 보내면 모드와 멤버십 ID 목록 전체를 보낸다. `ALL_ACTIVE_MEMBERS`는 빈 목록, `SELECTED_MEMBERS`는 중복 없는 활성 그룹 멤버 한 명 이상이어야 한다.
+- 가능 멤버 변경은 업무 설정과 미리 생성된 미래 회차에 적용한다. 현재 활성 회차의 담당자와 가능 멤버 스냅샷까지 즉시 바꾸려면 멤버별 참여 업무 일괄 변경 API의 `CURRENT_AND_FUTURE` 범위를 사용한다.
 - 일정이 실제로 달라지면 업무의 일정 개정 번호를 증가시킨다. 같은 일정을 다시 보내거나 업무명만 변경하면 개정 번호는 증가하지 않는다.
 - 변경 시점의 그룹 현지 날짜에 활성인 `ASSIGNED` 또는 `NEEDS_ATTENTION` 회차가 있으면 회차 ID, 담당자, 상태, 가능 멤버 스냅샷은 유지하고 주기·기간·마감 시각 스냅샷을 새 일정 개정으로 즉시 변경한다.
 - 활성 미종료 회차가 없으면 완료 이력을 변경하거나 PATCH 처리 중 새 회차를 만들지 않는다. 이후 스케줄러가 회차를 생성할 때 새 일정 개정을 사용한다.
