@@ -14,11 +14,14 @@ import gdg.sharinglog.web.rotation.dto.OccurrenceActionRequest;
 import gdg.sharinglog.web.rotation.dto.OccurrenceActionResponse;
 import gdg.sharinglog.web.rotation.dto.CompletedOccurrenceHistoryResponse;
 import gdg.sharinglog.web.rotation.dto.OccurrenceListResponse;
+import gdg.sharinglog.web.rotation.dto.OccurrenceWeekPreviewResponse;
 import gdg.sharinglog.web.rotation.dto.RetryAssignmentRequest;
 import gdg.sharinglog.web.rotation.http.ExpectedVersion;
 import gdg.sharinglog.web.rotation.http.IdempotencyKey;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
@@ -103,6 +106,22 @@ public class RotationOccurrenceController {
                 groupId,
                 authentication.getAuthorizedClientRegistrationId(),
                 authentication.getPrincipal()
+        );
+    }
+
+    @GetMapping("/weekly-preview")
+    public OccurrenceWeekPreviewResponse weeklyPreview(
+            @PathVariable String groupId,
+            @RequestParam(defaultValue = "0") @Min(0) @Max(4) int weekOffset,
+            @RequestParam(required = false) ChoreFrequency frequency,
+            OAuth2AuthenticationToken authentication
+    ) {
+        return queryService.findWeeklyPreview(
+                groupId,
+                authentication.getAuthorizedClientRegistrationId(),
+                authentication.getPrincipal(),
+                weekOffset,
+                frequency
         );
     }
 

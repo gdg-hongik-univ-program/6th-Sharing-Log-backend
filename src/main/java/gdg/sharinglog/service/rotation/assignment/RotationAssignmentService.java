@@ -34,6 +34,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -216,10 +217,13 @@ public class RotationAssignmentService {
     private Optional<Long> previousAssigneeId(ChoreOccurrence occurrence) {
         LocalDate periodStart = occurrence.getPeriodStart();
         return occurrenceRepository
-                .findFirstByChore_IdAndPeriodStartBeforeOrderByPeriodStartDesc(
+                .findAllNonCancelledBefore(
                         occurrence.getChore().getId(),
-                        periodStart
+                        periodStart,
+                        PageRequest.of(0, 1)
                 )
+                .stream()
+                .findFirst()
                 .flatMap(previous -> assignmentRepository
                         .findFirstByOccurrence_IdOrderBySequenceNumberDesc(previous.getId()))
                 .map(attempt -> attempt.getAssignee().getId());

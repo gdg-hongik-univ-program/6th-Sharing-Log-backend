@@ -18,6 +18,7 @@ import gdg.sharinglog.service.group.exception.GroupNotFoundException;
 import gdg.sharinglog.service.group.result.CreatedGroup;
 import gdg.sharinglog.service.group.result.UpdatedGroup;
 import gdg.sharinglog.service.rotation.occurrence.OccurrenceCommandService;
+import gdg.sharinglog.service.rotation.occurrence.OccurrencePlanService;
 import gdg.sharinglog.service.user.AuthenticatedUserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.core.user.OAuth2User;
@@ -35,6 +36,7 @@ public class GroupService {
     private final GroupMemberRepository groupMemberRepository;
     private final AuthenticatedUserService authenticatedUserService;
     private final OccurrenceCommandService occurrenceCommandService;
+    private final OccurrencePlanService occurrencePlanService;
 
     @Transactional
     public CreatedGroup createGroup(
@@ -141,6 +143,7 @@ public class GroupService {
 
         Instant effectiveDeletedAt = Objects.requireNonNull(deletedAt, "그룹 삭제 시각은 필수입니다.");
         occurrenceCommandService.leaveMember(membership.getPublicId(), effectiveDeletedAt);
+        occurrencePlanService.cancelGroupFuture(group.getId(), effectiveDeletedAt);
         for (GroupInvitation invitation : groupInvitationRepository.findAllByGroup_Id(group.getId())) {
             if (invitation.getRevokedAt() == null) {
                 invitation.revoke(effectiveDeletedAt);

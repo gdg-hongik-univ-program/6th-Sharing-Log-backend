@@ -4,9 +4,10 @@ public enum OccurrenceStatus {
     ASSIGNED,
     COMPLETED,
     SKIPPED,
+    CANCELLED,
     NEEDS_ATTENTION;
 
     public boolean isTerminal() {
-        return this == COMPLETED || this == SKIPPED;
+        return this == COMPLETED || this == SKIPPED || this == CANCELLED;
     }
 }

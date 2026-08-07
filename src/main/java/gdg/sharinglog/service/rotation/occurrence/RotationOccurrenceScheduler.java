@@ -5,6 +5,8 @@ import java.time.Instant;
 import gdg.sharinglog.repository.rotation.ChoreRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -14,7 +16,12 @@ import org.springframework.stereotype.Component;
 public class RotationOccurrenceScheduler {
 
     private final ChoreRepository choreRepository;
-    private final OccurrenceGenerationService generationService;
+    private final OccurrencePlanService planService;
+
+    @EventListener(ApplicationReadyEvent.class)
+    public void ensureRollingHorizonsOnStartup() {
+        ensureCurrentOccurrences();
+    }
 
     @Scheduled(
             cron = "${sharing-log.rotation.scheduler.cron:0 5 * * * *}",
@@ -24,10 +31,10 @@ public class RotationOccurrenceScheduler {
         Instant referenceTime = Instant.now();
         for (var chore : choreRepository.findAllActiveForOccurrenceGeneration()) {
             try {
-                generationService.ensureCurrentOccurrence(chore.getId(), referenceTime);
+                planService.ensureRollingHorizon(chore, referenceTime);
             } catch (RuntimeException exception) {
                 log.error(
-                        "Failed to generate the current occurrence for chore {}",
+                        "Failed to generate the rolling occurrence horizon for chore {}",
                         chore.getPublicId(),
                         exception
                 );

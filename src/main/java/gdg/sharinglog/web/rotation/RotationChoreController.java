@@ -172,7 +172,8 @@ public class RotationChoreController {
                             choreId,
                             authentication.getAuthorizedClientRegistrationId(),
                             authentication.getPrincipal(),
-                            expectedVersion.value()
+                            expectedVersion.value(),
+                            Instant.now()
                     );
                     return new CommandResponse<>(
                             204,

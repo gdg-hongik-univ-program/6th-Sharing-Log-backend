@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
@@ -106,6 +107,60 @@ class SubstituteRequestApplicationServiceTest {
         assertEquals(SubstituteRequestBox.OUTBOX, outbox.box());
         assertEquals(1, outbox.totalCount());
         assertEquals(created.requestId(), outbox.items().getFirst().requestId());
+    }
+
+    @Test
+    void futureOccurrenceAllowsSubstituteRequestAndAcceptance() {
+        List<GroupMember> members = members();
+        SharingGroup group = members.getFirst().getGroup();
+        Chore chore = choreRepository.save(Chore.daily(
+                group,
+                members.getFirst(),
+                "미래 공용 청소",
+                ChoreEligibilityMode.ALL_ACTIVE_MEMBERS,
+                LocalTime.of(21, 0),
+                REFERENCE.minusSeconds(60)
+        ));
+        var future = generationService.ensureOccurrencesUntil(
+                        chore.getId(),
+                        REFERENCE,
+                        LocalDate.of(2026, 7, 25)
+                )
+                .stream()
+                .filter(item -> item.getPeriodStart().equals(LocalDate.of(2026, 7, 24)))
+                .findFirst()
+                .orElseThrow();
+        entityManager.flush();
+        entityManager.refresh(future);
+        GroupMember requester = future.currentAssignee().orElseThrow();
+        GroupMember recipient = members.stream()
+                .filter(member -> !member.getId().equals(requester.getId()))
+                .findFirst()
+                .orElseThrow();
+
+        var created = service.create(
+                group.getPublicId(),
+                future.getPublicId(),
+                "google",
+                principal(requester),
+                future.getVersion(),
+                "미리 대타를 구해요.",
+                REFERENCE.plusSeconds(60)
+        );
+        var accepted = service.accept(
+                group.getPublicId(),
+                created.requestId(),
+                "google",
+                principal(recipient),
+                created.version(),
+                REFERENCE.plusSeconds(120)
+        );
+
+        assertEquals(SubstituteRequestStatus.ACCEPTED, accepted.status());
+        assertEquals(
+                recipient.getPublicId(),
+                accepted.occurrence().currentAssignee().membershipId()
+        );
     }
 
     @Test

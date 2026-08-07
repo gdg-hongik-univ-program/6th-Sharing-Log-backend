@@ -11,9 +11,11 @@ import gdg.sharinglog.domain.rotation.OccurrenceStatus;
 import gdg.sharinglog.repository.rotation.ChoreOccurrenceRepository;
 import gdg.sharinglog.service.rotation.access.RotationActor;
 import gdg.sharinglog.service.rotation.access.RotationActorAccessService;
+import gdg.sharinglog.service.rotation.occurrence.OccurrencePlanningHorizon;
 import gdg.sharinglog.web.rotation.RotationViewMapper;
 import gdg.sharinglog.web.rotation.dto.OccurrenceListResponse;
 import gdg.sharinglog.web.rotation.dto.CompletedOccurrenceHistoryResponse;
+import gdg.sharinglog.web.rotation.dto.OccurrenceWeekPreviewResponse;
 import gdg.sharinglog.repository.rotation.ChoreAssignmentAttemptRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.core.user.OAuth2User;
@@ -81,22 +83,62 @@ public class OccurrenceQueryService {
     ) {
         RotationActor actor =
                 accessService.requireActiveMember(groupPublicId, registrationId, principal);
+        LocalDate activeOn = LocalDate.now(actor.group().timeZone());
         List<ChoreOccurrence> occurrences = occurrenceRepository
-                .findAllByChore_Group_IdAndStatusAndCurrentAssignment_Assignee_IdOrderByDueAtAsc(
+                .findAllAssignedToMemberActiveOn(
                         actor.group().getId(),
-                        OccurrenceStatus.ASSIGNED,
-                        actor.membership().getId()
+                        actor.membership().getId(),
+                        activeOn
                 );
         return new OccurrenceListResponse(
                 actor.group().getPublicId(),
                 null,
                 new OccurrenceListResponse.QueryResponse(
-                        LocalDate.now(actor.group().timeZone()),
+                        activeOn,
                         actor.group().getTimeZoneId()
                 ),
                 occurrences.stream().map(item -> viewMapper.occurrence(item, actor)).toList(),
                 null,
                 false
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public OccurrenceWeekPreviewResponse findWeeklyPreview(
+            String groupPublicId,
+            String registrationId,
+            OAuth2User principal,
+            int weekOffset,
+            ChoreFrequency frequency
+    ) {
+        RotationActor actor =
+                accessService.requireActiveMember(groupPublicId, registrationId, principal);
+        LocalDate activeOn = LocalDate.now(actor.group().timeZone());
+        var window = OccurrencePlanningHorizon.weekWindow(
+                actor.group(),
+                activeOn,
+                weekOffset
+        );
+        List<ChoreOccurrence> occurrences = occurrenceRepository
+                .findAllPlannedOverlapping(
+                        actor.group().getId(),
+                        window.fromInclusive(),
+                        window.toExclusive()
+                )
+                .stream()
+                .filter(item -> frequency == null || item.getFrequencySnapshot() == frequency)
+                .toList();
+
+        return new OccurrenceWeekPreviewResponse(
+                actor.group().getPublicId(),
+                frequency,
+                weekOffset,
+                window.fromInclusive(),
+                window.toExclusive(),
+                actor.group().getTimeZoneId(),
+                occurrences.stream()
+                        .map(item -> viewMapper.occurrence(item, actor))
+                        .toList()
         );
     }
 

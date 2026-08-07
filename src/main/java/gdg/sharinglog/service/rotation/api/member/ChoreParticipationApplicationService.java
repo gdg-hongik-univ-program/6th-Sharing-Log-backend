@@ -22,6 +22,7 @@ import gdg.sharinglog.repository.rotation.ChoreRepository;
 import gdg.sharinglog.repository.rotation.OccurrenceEligibleMemberRepository;
 import gdg.sharinglog.service.rotation.assignment.RotationAssignmentService;
 import gdg.sharinglog.service.rotation.enrollment.ChoreEnrollmentService;
+import gdg.sharinglog.service.rotation.occurrence.OccurrencePlanService;
 import gdg.sharinglog.service.rotation.access.RotationActor;
 import gdg.sharinglog.service.rotation.access.RotationActorAccessService;
 import gdg.sharinglog.service.rotation.substitute.SubstituteRequestLifecycleService;
@@ -44,6 +45,7 @@ public class ChoreParticipationApplicationService {
     private final ChoreEnrollmentService enrollmentService;
     private final RotationAssignmentService assignmentService;
     private final SubstituteRequestLifecycleService substituteRequestLifecycleService;
+    private final OccurrencePlanService occurrencePlanService;
 
     @Transactional
     public UpdatedChoreParticipations update(
@@ -101,6 +103,14 @@ public class ChoreParticipationApplicationService {
                 }
             }
             pendingResults.add(new PendingResult(change, changed, impact));
+        }
+
+        List<Chore> changedChores = pendingResults.stream()
+                .filter(PendingResult::changed)
+                .map(result -> result.change().chore())
+                .toList();
+        if (!changedChores.isEmpty()) {
+            occurrencePlanService.regenerateFutures(changedChores, effectiveChangedAt);
         }
 
         choreRepository.flush();
@@ -188,8 +198,12 @@ public class ChoreParticipationApplicationService {
             Instant changedAt
     ) {
         List<GroupMember> snapshotMembers = distinctActiveMembers(activeMembers);
+        var activeOn = changedAt.atZone(chore.getGroup().timeZone()).toLocalDate();
         List<ChoreOccurrence> occurrences =
-                occurrenceRepository.findAllOpenByChoreIdForUpdate(chore.getId());
+                occurrenceRepository.findAllOpenActiveOnByChoreIdForUpdate(
+                        chore.getId(),
+                        activeOn
+                );
         int reassigned = 0;
         int needsAttention = 0;
 

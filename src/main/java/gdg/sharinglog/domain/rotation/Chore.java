@@ -213,6 +213,10 @@ public class Chore {
         return true;
     }
 
+    public void advancePlanningRevision() {
+        this.scheduleRevision = Math.incrementExact(this.scheduleRevision);
+    }
+
     public void recordEnrollmentChange() {
         this.eligibilityRevision = Math.incrementExact(this.eligibilityRevision);
     }

@@ -59,6 +59,10 @@ public class OccurrenceCommandService {
             Instant completedAt,
             String actorNote
     ) {
+        Instant effectiveCompletedAt = Objects.requireNonNull(
+                completedAt,
+                "Completion time is required."
+        );
         ChoreOccurrence occurrence = lockedOccurrence(occurrencePublicId);
         GroupMember actor = requireActorOfOccurrence(actorMemberPublicId, occurrence);
         if (occurrence.getStatus() == OccurrenceStatus.COMPLETED) {
@@ -66,12 +70,20 @@ public class OccurrenceCommandService {
             return occurrence;
         }
         requireCurrentAssignee(occurrence, actor);
+        var completedOn = effectiveCompletedAt
+                .atZone(java.time.ZoneId.of(occurrence.getTimeZoneIdSnapshot()))
+                .toLocalDate();
+        if (completedOn.isBefore(occurrence.getPeriodStart())) {
+            throw new OccurrenceCommandConflictException(
+                    "A future occurrence cannot be completed."
+            );
+        }
         substituteRequestLifecycleService.cancelPendingForOccurrence(
                 occurrence,
-                completedAt
+                effectiveCompletedAt
         );
         occurrence.complete(
-                Objects.requireNonNull(completedAt, "완료 시각은 필수입니다."),
+                effectiveCompletedAt,
                 actorNote
         );
         return occurrenceRepository.saveAndFlush(occurrence);
@@ -209,11 +221,15 @@ public class OccurrenceCommandService {
             String memberPublicId,
             Instant leftAt
     ) {
+        Instant effectiveLeftAt = Objects.requireNonNull(
+                leftAt,
+                "Member leave time is required."
+        );
         String requiredMemberPublicId =
                 Objects.requireNonNull(memberPublicId, "멤버 공개 ID는 필수입니다.");
         Long groupId = groupMemberRepository.findGroupIdByPublicId(requiredMemberPublicId)
                 .orElseThrow(() -> new MemberNotFoundException(requiredMemberPublicId));
-        sharingGroupRepository.findByIdForUpdate(groupId)
+        var group = sharingGroupRepository.findByIdForUpdate(groupId)
                 .orElseThrow(() -> new IllegalStateException("멤버의 그룹을 찾을 수 없습니다."));
         GroupMember member = groupMemberRepository.findByPublicIdForUpdate(memberPublicId)
                 .orElseThrow(() -> new MemberNotFoundException(memberPublicId));
@@ -235,12 +251,11 @@ public class OccurrenceCommandService {
         }
 
         List<ChoreOccurrence> lockedAffected = occurrenceRepository
-                .findAllByCurrentAssignment_Assignee_IdAndStatusOrderByIdAsc(
+                .findAllCurrentOrPastAssignedToMemberForUpdate(
                         member.getId(),
-                        OccurrenceStatus.ASSIGNED
+                        effectiveLeftAt.atZone(group.timeZone()).toLocalDate()
                 );
 
-        Instant effectiveLeftAt = Objects.requireNonNull(leftAt, "탈퇴 시각은 필수입니다.");
         substituteRequestLifecycleService.invalidatePendingForMember(
                 member,
                 effectiveLeftAt

@@ -140,7 +140,12 @@ public class RotationViewMapper {
                 .map(GroupMember::getId)
                 .filter(actor.membership().getId()::equals)
                 .isPresent()) {
-            actions.add(OccurrenceSummaryResponse.AvailableAction.COMPLETE);
+            var activeOn = java.time.LocalDate.now(
+                    java.time.ZoneId.of(occurrence.getTimeZoneIdSnapshot())
+            );
+            if (!occurrence.getPeriodStart().isAfter(activeOn)) {
+                actions.add(OccurrenceSummaryResponse.AvailableAction.COMPLETE);
+            }
             if (substituteRequestRepository
                     .findByOccurrence_IdAndActiveMarker(occurrence.getId(), 1)
                     .isEmpty()) {
