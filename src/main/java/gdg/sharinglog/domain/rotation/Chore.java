@@ -183,6 +183,19 @@ public class Chore {
         this.name = normalizeName(name);
     }
 
+    public boolean changeEligibilityMode(ChoreEligibilityMode eligibilityMode) {
+        ChoreEligibilityMode requiredMode = Objects.requireNonNull(
+                eligibilityMode,
+                "가능 멤버 방식은 필수입니다."
+        );
+        if (this.eligibilityMode == requiredMode) {
+            return false;
+        }
+        this.eligibilityMode = requiredMode;
+        recordEnrollmentChange();
+        return true;
+    }
+
     public boolean reschedule(
             ChoreFrequency frequency,
             LocalTime dueTime,

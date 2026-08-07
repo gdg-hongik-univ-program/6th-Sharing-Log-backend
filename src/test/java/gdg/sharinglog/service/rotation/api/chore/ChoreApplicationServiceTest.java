@@ -2,6 +2,7 @@ package gdg.sharinglog.service.rotation.api.chore;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -111,7 +112,8 @@ class ChoreApplicationServiceTest {
                                 LocalTime.of(19, 0),
                                 DayOfWeek.SUNDAY,
                                 null
-                        )
+                        ),
+                        null
                 ),
                 0L,
                 CHANGED_AT
@@ -120,6 +122,59 @@ class ChoreApplicationServiceTest {
         assertEquals(1L, updated.chore().getScheduleRevision());
         verify(occurrenceGenerationService).rescheduleActiveOccurrence(chore, CHANGED_AT);
         verify(occurrencePlanService).regenerateFutureAfterScheduleChange(chore, CHANGED_AT);
+    }
+
+    @Test
+    void updateReplacesEligibleMembersAndRegeneratesFutureOccurrences() {
+        GroupMember firstSelected = member("first-selected", 21L);
+        GroupMember secondSelected = member("second-selected", 22L);
+        GroupMember removed = member("removed", 23L);
+        RotationActor actor = new RotationActor(group, ownerMembership, ownerMembership.getUser());
+        when(accessService.requireOwnerForUpdate(group.getPublicId(), REGISTRATION_ID, principal))
+                .thenReturn(actor);
+        when(choreRepository.findByPublicIdAndGroupPublicIdForUpdate(
+                chore.getPublicId(),
+                group.getPublicId()
+        )).thenReturn(Optional.of(chore));
+        when(groupMemberRepository.findAllByGroup_IdAndPublicIdInAndStatusOrderById(
+                group.getId(),
+                java.util.Set.of(firstSelected.getPublicId(), secondSelected.getPublicId()),
+                gdg.sharinglog.domain.MemberStatus.ACTIVE
+        )).thenReturn(List.of(firstSelected, secondSelected));
+        when(enrollmentService.findActiveMembers(chore))
+                .thenReturn(
+                        List.of(firstSelected, secondSelected, removed),
+                        List.of(firstSelected, secondSelected)
+                );
+        when(enrollmentService.removeOrDisable(chore, removed, CHANGED_AT)).thenReturn(true);
+        when(choreRepository.saveAndFlush(chore)).thenReturn(chore);
+
+        ChoreView updated = service.update(
+                group.getPublicId(),
+                chore.getPublicId(),
+                REGISTRATION_ID,
+                principal,
+                new UpdateChoreCommand(
+                        null,
+                        null,
+                        new UpdateChoreCommand.Eligibility(
+                                ChoreEligibilityMode.SELECTED_MEMBERS,
+                                List.of(
+                                        firstSelected.getPublicId(),
+                                        secondSelected.getPublicId()
+                                )
+                        )
+                ),
+                0L,
+                CHANGED_AT
+        );
+
+        assertEquals(ChoreEligibilityMode.SELECTED_MEMBERS, updated.chore().getEligibilityMode());
+        assertEquals(List.of(firstSelected, secondSelected), updated.eligibleMembers());
+        verify(enrollmentService).removeOrDisable(chore, removed, CHANGED_AT);
+        verify(enrollmentService, never()).removeOrDisable(chore, firstSelected, CHANGED_AT);
+        verify(enrollmentService, never()).removeOrDisable(chore, secondSelected, CHANGED_AT);
+        verify(occurrencePlanService).regenerateFuture(chore, CHANGED_AT);
     }
 
     @Test
@@ -144,5 +199,15 @@ class ChoreApplicationServiceTest {
 
         assertFalse(chore.isActive());
         verify(occurrencePlanService).cancelFutureForDeactivation(chore, CHANGED_AT);
+    }
+
+    private GroupMember member(String providerUserId, long id) {
+        User user = User.builder()
+                .provider(OAuthProvider.GOOGLE)
+                .providerUserId(providerUserId)
+                .build();
+        GroupMember member = GroupMember.member(group, user);
+        ReflectionTestUtils.setField(member, "id", id);
+        return member;
     }
 }

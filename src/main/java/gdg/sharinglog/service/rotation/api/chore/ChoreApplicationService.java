@@ -119,6 +119,13 @@ public class ChoreApplicationService {
                     schedule.biweeklyAnchorDate()
             );
         }
+        boolean eligibilityChanged = command.eligibility() != null
+                && updateEligibility(
+                        actor,
+                        chore,
+                        command.eligibility(),
+                        effectiveChangedAt
+                );
 
         Chore updated = choreRepository.saveAndFlush(chore);
         if (scheduleChanged) {
@@ -130,7 +137,7 @@ public class ChoreApplicationService {
                     updated,
                     effectiveChangedAt
             );
-        } else if (nameChanged) {
+        } else if (nameChanged || eligibilityChanged) {
             occurrencePlanService.regenerateFuture(updated, effectiveChangedAt);
         }
         return new ChoreView(updated, currentEligibleMembers(updated));
@@ -203,18 +210,31 @@ public class ChoreApplicationService {
             RotationActor actor,
             CreateChoreCommand command
     ) {
-        ChoreEligibilityMode mode =
-                Objects.requireNonNull(command.eligibilityMode(), "가능 멤버 모드는 필수입니다.");
-        List<String> requested = command.eligibleMembershipPublicIds();
-        if (mode == ChoreEligibilityMode.ALL_ACTIVE_MEMBERS) {
-            if (!requested.isEmpty()) {
+        return resolveSelectedMembers(
+                actor,
+                command.eligibilityMode(),
+                command.eligibleMembershipPublicIds()
+        );
+    }
+
+    private List<GroupMember> resolveSelectedMembers(
+            RotationActor actor,
+            ChoreEligibilityMode mode,
+            List<String> requested
+    ) {
+        ChoreEligibilityMode requiredMode =
+                Objects.requireNonNull(mode, "가능 멤버 모드는 필수입니다.");
+        List<String> requiredRequested =
+                Objects.requireNonNull(requested, "가능 멤버 목록은 필수입니다.");
+        if (requiredMode == ChoreEligibilityMode.ALL_ACTIVE_MEMBERS) {
+            if (!requiredRequested.isEmpty()) {
                 throw new IllegalArgumentException("전체 멤버 모드에는 개별 멤버를 지정할 수 없습니다.");
             }
             return List.of();
         }
 
-        Set<String> distinct = new HashSet<>(requested);
-        if (requested.isEmpty() || distinct.size() != requested.size()) {
+        Set<String> distinct = new HashSet<>(requiredRequested);
+        if (requiredRequested.isEmpty() || distinct.size() != requiredRequested.size()) {
             throw new IllegalArgumentException("선택 멤버는 중복 없이 한 명 이상이어야 합니다.");
         }
         List<GroupMember> members =
@@ -232,6 +252,47 @@ public class ChoreApplicationService {
             );
         }
         return members;
+    }
+
+    private boolean updateEligibility(
+            RotationActor actor,
+            Chore chore,
+            UpdateChoreCommand.Eligibility eligibility,
+            Instant changedAt
+    ) {
+        ChoreEligibilityMode mode =
+                Objects.requireNonNull(eligibility.mode(), "가능 멤버 모드는 필수입니다.");
+        List<GroupMember> selectedMembers = resolveSelectedMembers(
+                actor,
+                mode,
+                eligibility.eligibleMembershipPublicIds()
+        );
+        List<GroupMember> desiredMembers = mode == ChoreEligibilityMode.ALL_ACTIVE_MEMBERS
+                ? groupMemberRepository.findAllByGroup_IdAndStatusOrderById(
+                        actor.group().getId(),
+                        MemberStatus.ACTIVE
+                )
+                : selectedMembers;
+        List<GroupMember> currentMembers = currentEligibleMembers(chore);
+        Set<String> desiredIds = desiredMembers.stream()
+                .map(GroupMember::getPublicId)
+                .collect(java.util.stream.Collectors.toSet());
+        Set<String> currentIds = currentMembers.stream()
+                .map(GroupMember::getPublicId)
+                .collect(java.util.stream.Collectors.toSet());
+
+        boolean changed = chore.changeEligibilityMode(mode);
+        for (GroupMember current : currentMembers) {
+            if (!desiredIds.contains(current.getPublicId())) {
+                changed |= enrollmentService.removeOrDisable(chore, current, changedAt);
+            }
+        }
+        for (GroupMember desired : desiredMembers) {
+            if (!currentIds.contains(desired.getPublicId())) {
+                changed |= enrollmentService.addOrReactivate(chore, desired, changedAt);
+            }
+        }
+        return changed;
     }
 
     private List<GroupMember> currentEligibleMembers(Chore chore) {
