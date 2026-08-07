@@ -3,7 +3,7 @@ git switch -c feature/#50-group-api-check-ui      # 타입/이슈번호-작업�
 
 #### 배포 흐름
 
-코딩 - 빌드 - 명령어 3개 powershell 입력
+코딩 -> 빌드(build) -> 아래 명령어 3개 powershell 입력
 
 Set-Location 'C:\Users\SAMSUNG\Desktop\Sharing Log\sharingLog' # pc마다 다름
 
@@ -20,10 +20,10 @@ $env:JAVA_HOME='C:\Users\SAMSUNG\.jdks\corretto-26.0.1'
 
 #### 동기화(최신화) 흐름
 
-git stash push -u -m "before upstream sync"
+git stash push -u -m "before upstream sync" # 작업한 것 임시 저장
 git fetch upstream
 git merge upstream/develop
-git stash pop
+git stash pop # 임시 저장한 것 꺼내기
 
 ## Google 로그인 실행 방법
   
