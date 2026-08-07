@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 
@@ -358,6 +359,42 @@ class OccurrenceCommandServiceTest {
         );
 
         assertEquals(MemberStatus.ACTIVE, owner.getStatus());
+    }
+
+    @Test
+    void futureOccurrenceCannotBeCompleted() {
+        Context context = context("future-complete");
+        Chore chore = choreRepository.save(Chore.daily(
+                context.group(),
+                context.members().getFirst(),
+                "미래 청소",
+                ChoreEligibilityMode.ALL_ACTIVE_MEMBERS,
+                LocalTime.of(21, 0),
+                REFERENCE.minusSeconds(60)
+        ));
+        List<ChoreOccurrence> occurrences = generationService.ensureOccurrencesUntil(
+                chore.getId(),
+                REFERENCE,
+                LocalDate.of(2026, 7, 25)
+        );
+        ChoreOccurrence future = occurrences.stream()
+                .filter(item -> item.getPeriodStart().equals(LocalDate.of(2026, 7, 24)))
+                .findFirst()
+                .orElseThrow();
+        GroupMember assignee = future.currentAssignee().orElseThrow();
+
+        assertThrows(
+                OccurrenceCommandConflictException.class,
+                () -> commandService.complete(
+                        future.getPublicId(),
+                        assignee.getPublicId(),
+                        ACTION_AT
+                )
+        );
+        assertEquals(OccurrenceStatus.ASSIGNED, future.getStatus());
+        assertTrue(assignmentRepository
+                .findFirstByOccurrence_IdAndEndedAtIsNull(future.getId())
+                .isPresent());
     }
 
     @Test

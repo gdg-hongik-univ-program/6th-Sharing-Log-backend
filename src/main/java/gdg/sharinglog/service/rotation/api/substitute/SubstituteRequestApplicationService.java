@@ -23,6 +23,7 @@ import gdg.sharinglog.repository.rotation.OccurrenceEligibleMemberRepository;
 import gdg.sharinglog.repository.rotation.SubstituteRequestRecipientRepository;
 import gdg.sharinglog.repository.rotation.SubstituteRequestRepository;
 import gdg.sharinglog.service.rotation.assignment.DirectAssignmentService;
+import gdg.sharinglog.service.rotation.occurrence.OccurrencePlanService;
 import gdg.sharinglog.service.rotation.access.RotationActor;
 import gdg.sharinglog.service.rotation.access.RotationActorAccessService;
 import gdg.sharinglog.web.rotation.RotationViewMapper;
@@ -48,6 +49,7 @@ public class SubstituteRequestApplicationService {
     private final SubstituteRequestRepository requestRepository;
     private final SubstituteRequestRecipientRepository recipientRepository;
     private final DirectAssignmentService directAssignmentService;
+    private final OccurrencePlanService occurrencePlanService;
     private final RotationViewMapper viewMapper;
 
     @Transactional
@@ -216,6 +218,12 @@ public class SubstituteRequestApplicationService {
         recipientRepository.saveAll(allRecipients);
         request.accept(acceptedAssignment, effectiveAcceptedAt);
         requestRepository.saveAndFlush(request);
+        var acceptedOn = effectiveAcceptedAt
+                .atZone(java.time.ZoneId.of(occurrence.getTimeZoneIdSnapshot()))
+                .toLocalDate();
+        if (!occurrence.getPeriodStart().isAfter(acceptedOn)) {
+            occurrencePlanService.regenerateFuture(occurrence.getChore(), effectiveAcceptedAt);
+        }
         return response(request, actor);
     }
 

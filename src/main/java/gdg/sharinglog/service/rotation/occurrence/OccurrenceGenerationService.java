@@ -1,6 +1,8 @@
 package gdg.sharinglog.service.rotation.occurrence;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -19,6 +21,7 @@ import gdg.sharinglog.service.rotation.enrollment.ChoreEnrollmentService;
 import gdg.sharinglog.service.rotation.exception.ChoreNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -35,8 +38,55 @@ public class OccurrenceGenerationService {
 
     @Transactional
     public ChoreOccurrence ensureCurrentOccurrence(Long choreId, Instant referenceInstant) {
+        Instant effectiveReference = Objects.requireNonNull(
+                referenceInstant,
+                "기준 시각은 필수입니다."
+        );
+        Chore chore = lockedActiveChore(choreId);
+        OccurrenceSchedule schedule = scheduleResolver.resolve(chore, effectiveReference);
+        return ensureOccurrence(chore, schedule, effectiveReference);
+    }
+
+    @Transactional
+    public List<ChoreOccurrence> ensureOccurrencesUntil(
+            Long choreId,
+            Instant generatedAt,
+            LocalDate horizonEndExclusive
+    ) {
+        Instant effectiveGeneratedAt = Objects.requireNonNull(
+                generatedAt,
+                "생성 시각은 필수입니다."
+        );
+        LocalDate effectiveHorizonEnd = Objects.requireNonNull(
+                horizonEndExclusive,
+                "생성 종료일은 필수입니다."
+        );
+        Chore chore = lockedActiveChore(choreId);
+        LocalDate generatedOn = effectiveGeneratedAt
+                .atZone(chore.getGroup().timeZone())
+                .toLocalDate();
+        if (!effectiveHorizonEnd.isAfter(generatedOn)) {
+            throw new IllegalArgumentException("생성 종료일은 생성 기준일보다 뒤여야 합니다.");
+        }
+
+        List<ChoreOccurrence> ensured = new ArrayList<>();
+        OccurrenceSchedule schedule = scheduleResolver.resolve(chore, effectiveGeneratedAt);
+        while (schedule.periodStart().isBefore(effectiveHorizonEnd)) {
+            ensured.add(ensureOccurrence(
+                    chore,
+                    schedule,
+                    effectiveGeneratedAt
+            ));
+            Instant nextPeriodReference = schedule.periodEndExclusive()
+                    .atStartOfDay(chore.getGroup().timeZone())
+                    .toInstant();
+            schedule = scheduleResolver.resolve(chore, nextPeriodReference);
+        }
+        return List.copyOf(ensured);
+    }
+
+    private Chore lockedActiveChore(Long choreId) {
         Objects.requireNonNull(choreId, "업무 ID는 필수입니다.");
-        Objects.requireNonNull(referenceInstant, "기준 시각은 필수입니다.");
         Long groupId = choreRepository.findGroupIdById(choreId)
                 .orElseThrow(() -> new ChoreNotFoundException(choreId));
         sharingGroupRepository.findByIdForUpdate(groupId)
@@ -46,38 +96,38 @@ public class OccurrenceGenerationService {
         if (!chore.isActive()) {
             throw new IllegalStateException("비활성 업무의 새 회차는 생성할 수 없습니다.");
         }
+        return chore;
+    }
 
-        OccurrenceSchedule schedule = scheduleResolver.resolve(chore, referenceInstant);
+    private ChoreOccurrence ensureOccurrence(
+            Chore chore,
+            OccurrenceSchedule schedule,
+            Instant generatedAt
+    ) {
         var exactOccurrence = occurrenceRepository
-                .findByChore_IdAndScheduleRevisionSnapshotAndPeriodStart(
+                .findByChore_IdAndScheduleRevisionSnapshotAndPeriodStartAndStatusNot(
                         chore.getId(),
                         chore.getScheduleRevision(),
-                        schedule.periodStart()
+                        schedule.periodStart(),
+                        gdg.sharinglog.domain.rotation.OccurrenceStatus.CANCELLED
                 );
         if (exactOccurrence.isPresent()) {
             return exactOccurrence.get();
         }
 
-        var latestOccurrence = occurrenceRepository
-                .findFirstByChore_IdAndScheduleRevisionSnapshotOrderByPeriodEndExclusiveDescIdDesc(
+        var overlappingOccurrence = occurrenceRepository
+                .findAllNonCancelledOverlapping(
                         chore.getId(),
-                        chore.getScheduleRevision()
-                );
-        if (latestOccurrence.isPresent()
-                && schedule.periodStart().isBefore(
-                        latestOccurrence.get().getPeriodEndExclusive()
-                )) {
-            return latestOccurrence.get();
+                        schedule.periodStart(),
+                        schedule.periodEndExclusive(),
+                        PageRequest.of(0, 1)
+                )
+                .stream()
+                .findFirst();
+        if (overlappingOccurrence.isPresent()) {
+            return overlappingOccurrence.get();
         }
-        var latestAcrossRevisions = occurrenceRepository
-                .findFirstByChore_IdOrderByPeriodEndExclusiveDescIdDesc(chore.getId());
-        if (latestAcrossRevisions.isPresent()
-                && schedule.periodStart().isBefore(
-                        latestAcrossRevisions.get().getPeriodEndExclusive()
-                )) {
-            return latestAcrossRevisions.get();
-        }
-        return createAndAssign(chore, schedule, referenceInstant);
+        return createAndAssign(chore, schedule, generatedAt);
     }
 
     @Transactional

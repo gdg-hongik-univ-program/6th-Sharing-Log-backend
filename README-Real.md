@@ -18,6 +18,13 @@ $env:JAVA_HOME='C:\Users\SAMSUNG\.jdks\corretto-26.0.1'
 
 배포된 최신 버전 서버의 API 확인 가능
 
+#### 동기화(최신화) 흐름
+
+git stash push -u -m "before upstream sync"
+git fetch upstream
+git merge upstream/develop
+git stash pop
+
 ## Google 로그인 실행 방법
   
 Google Cloud Console에서 OAuth 2.0 Client ID를 만들고 승인된 리디렉션 URI에 아래 주소를 등록합니다.

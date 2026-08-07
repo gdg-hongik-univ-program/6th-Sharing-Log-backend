@@ -16,6 +16,7 @@ import gdg.sharinglog.repository.GroupMemberRepository;
 import gdg.sharinglog.repository.rotation.ChoreRepository;
 import gdg.sharinglog.service.rotation.enrollment.ChoreEnrollmentService;
 import gdg.sharinglog.service.rotation.occurrence.OccurrenceGenerationService;
+import gdg.sharinglog.service.rotation.occurrence.OccurrencePlanService;
 import gdg.sharinglog.service.rotation.access.RotationActor;
 import gdg.sharinglog.service.rotation.access.RotationActorAccessService;
 import gdg.sharinglog.service.rotation.access.RotationMemberNotFoundException;
@@ -36,6 +37,7 @@ public class ChoreApplicationService {
     private final ChoreRepository choreRepository;
     private final ChoreEnrollmentService enrollmentService;
     private final OccurrenceGenerationService occurrenceGenerationService;
+    private final OccurrencePlanService occurrencePlanService;
 
     @Transactional
     public CreatedChore create(
@@ -54,8 +56,9 @@ public class ChoreApplicationService {
         Chore chore = choreRepository.saveAndFlush(createChore(actor, command, effectiveCreatedAt));
         enrollmentService.initializeChore(chore, selectedMembers, effectiveCreatedAt);
 
-        var occurrence =
-                occurrenceGenerationService.ensureCurrentOccurrence(chore.getId(), effectiveCreatedAt);
+        var occurrence = occurrencePlanService
+                .ensureRollingHorizon(chore, effectiveCreatedAt)
+                .getFirst();
         return new CreatedChore(new ChoreView(chore, selectedMembers), occurrence, actor);
     }
 
@@ -101,9 +104,11 @@ public class ChoreApplicationService {
             throw new IllegalStateException("잠긴 업무와 접근 그룹이 일치하지 않습니다.");
         }
 
+        String originalName = chore.getName();
         if (command.name() != null) {
             chore.rename(command.name());
         }
+        boolean nameChanged = !originalName.equals(chore.getName());
         boolean scheduleChanged = false;
         if (command.schedule() != null) {
             UpdateChoreCommand.Schedule schedule = command.schedule();
@@ -121,6 +126,12 @@ public class ChoreApplicationService {
                     updated,
                     effectiveChangedAt
             );
+            occurrencePlanService.regenerateFutureAfterScheduleChange(
+                    updated,
+                    effectiveChangedAt
+            );
+        } else if (nameChanged) {
+            occurrencePlanService.regenerateFuture(updated, effectiveChangedAt);
         }
         return new ChoreView(updated, currentEligibleMembers(updated));
     }
@@ -131,8 +142,13 @@ public class ChoreApplicationService {
             String chorePublicId,
             String registrationId,
             OAuth2User principal,
-            long expectedVersion
+            long expectedVersion,
+            Instant changedAt
     ) {
+        Instant effectiveChangedAt = Objects.requireNonNull(
+                changedAt,
+                "Chore deactivation time is required."
+        );
         accessService.requireOwnerForUpdate(groupPublicId, registrationId, principal);
         Chore chore = choreRepository
                 .findByPublicIdAndGroupPublicIdForUpdate(chorePublicId, groupPublicId)
@@ -143,6 +159,7 @@ public class ChoreApplicationService {
         if (chore.isActive()) {
             chore.deactivate();
             choreRepository.saveAndFlush(chore);
+            occurrencePlanService.cancelFutureForDeactivation(chore, effectiveChangedAt);
         }
         return chore.getVersion();
     }

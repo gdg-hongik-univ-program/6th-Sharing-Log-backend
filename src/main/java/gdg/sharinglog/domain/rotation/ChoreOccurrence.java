@@ -264,10 +264,20 @@ public class ChoreOccurrence {
     }
 
     public void complete(Instant completedAt, String actorNote) {
+        Instant effectiveCompletedAt = Objects.requireNonNull(
+                completedAt,
+                "Completion time is required."
+        );
+        LocalDate completedOn = effectiveCompletedAt
+                .atZone(ZoneId.of(timeZoneIdSnapshot))
+                .toLocalDate();
+        if (completedOn.isBefore(periodStart)) {
+            throw new IllegalStateException("A future occurrence cannot be completed.");
+        }
         close(
                 OccurrenceStatus.COMPLETED,
                 AssignmentEndReason.COMPLETED,
-                completedAt,
+                effectiveCompletedAt,
                 actorNote
         );
     }
@@ -283,6 +293,28 @@ public class ChoreOccurrence {
                 skippedAt,
                 actorNote
         );
+    }
+
+    public void cancelForPlanRegeneration(Instant cancelledAt) {
+        if (status.isTerminal()) {
+            throw new IllegalStateException("A terminal occurrence cannot be cancelled for regeneration.");
+        }
+        Instant effectiveCancelledAt = Objects.requireNonNull(
+                cancelledAt,
+                "Cancellation time is required."
+        );
+        if (status == OccurrenceStatus.ASSIGNED) {
+            requireAssigned();
+            currentAssignment.end(
+                    AssignmentEndReason.PLAN_REGENERATED,
+                    effectiveCancelledAt
+            );
+            currentAssignment = null;
+        } else if (status != OccurrenceStatus.NEEDS_ATTENTION) {
+            throw new IllegalStateException("Only an open occurrence can be regenerated.");
+        }
+        status = OccurrenceStatus.CANCELLED;
+        closedAt = effectiveCancelledAt;
     }
 
     public void releaseForReassignment(AssignmentEndReason reason, Instant endedAt) {

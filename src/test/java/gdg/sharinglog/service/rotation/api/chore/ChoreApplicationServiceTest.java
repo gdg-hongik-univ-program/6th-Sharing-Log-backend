@@ -1,6 +1,7 @@
 package gdg.sharinglog.service.rotation.api.chore;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -21,6 +22,7 @@ import gdg.sharinglog.repository.GroupMemberRepository;
 import gdg.sharinglog.repository.rotation.ChoreRepository;
 import gdg.sharinglog.service.rotation.enrollment.ChoreEnrollmentService;
 import gdg.sharinglog.service.rotation.occurrence.OccurrenceGenerationService;
+import gdg.sharinglog.service.rotation.occurrence.OccurrencePlanService;
 import gdg.sharinglog.service.rotation.access.RotationActor;
 import gdg.sharinglog.service.rotation.access.RotationActorAccessService;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,6 +54,9 @@ class ChoreApplicationServiceTest {
 
     @Mock
     OccurrenceGenerationService occurrenceGenerationService;
+
+    @Mock
+    OccurrencePlanService occurrencePlanService;
 
     @Mock
     OAuth2User principal;
@@ -114,5 +119,30 @@ class ChoreApplicationServiceTest {
 
         assertEquals(1L, updated.chore().getScheduleRevision());
         verify(occurrenceGenerationService).rescheduleActiveOccurrence(chore, CHANGED_AT);
+        verify(occurrencePlanService).regenerateFutureAfterScheduleChange(chore, CHANGED_AT);
+    }
+
+    @Test
+    void deactivateCancelsFuturePlanWithoutCreatingReplacement() {
+        RotationActor actor = new RotationActor(group, ownerMembership, ownerMembership.getUser());
+        when(accessService.requireOwnerForUpdate(group.getPublicId(), REGISTRATION_ID, principal))
+                .thenReturn(actor);
+        when(choreRepository.findByPublicIdAndGroupPublicIdForUpdate(
+                chore.getPublicId(),
+                group.getPublicId()
+        )).thenReturn(Optional.of(chore));
+        when(choreRepository.saveAndFlush(chore)).thenReturn(chore);
+
+        service.deactivate(
+                group.getPublicId(),
+                chore.getPublicId(),
+                REGISTRATION_ID,
+                principal,
+                0L,
+                CHANGED_AT
+        );
+
+        assertFalse(chore.isActive());
+        verify(occurrencePlanService).cancelFutureForDeactivation(chore, CHANGED_AT);
     }
 }

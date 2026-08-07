@@ -24,6 +24,7 @@ import gdg.sharinglog.repository.rotation.ChoreRepository;
 import gdg.sharinglog.repository.rotation.OccurrenceEligibleMemberRepository;
 import gdg.sharinglog.service.rotation.assignment.RotationAssignmentService;
 import gdg.sharinglog.service.rotation.enrollment.ChoreEnrollmentService;
+import gdg.sharinglog.service.rotation.occurrence.OccurrencePlanService;
 import gdg.sharinglog.service.rotation.access.RotationActor;
 import gdg.sharinglog.service.rotation.access.RotationActorAccessService;
 import gdg.sharinglog.service.rotation.substitute.SubstituteRequestLifecycleService;
@@ -72,6 +73,9 @@ class ChoreParticipationApplicationServiceTest {
 
     @Mock
     SubstituteRequestLifecycleService substituteRequestLifecycleService;
+
+    @Mock
+    OccurrencePlanService occurrencePlanService;
 
     @Mock
     OAuth2User principal;
@@ -132,6 +136,7 @@ class ChoreParticipationApplicationServiceTest {
         assertEquals(0, updated.chores().getFirst().rebuiltOccurrenceCount());
         verify(enrollmentService).addOrReactivate(chore, target, CHANGED_AT);
         verifyNoInteractions(occurrenceRepository, eligibilityRepository, assignmentService);
+        verify(occurrencePlanService).regenerateFutures(List.of(chore), CHANGED_AT);
     }
 
     @Test
@@ -140,6 +145,7 @@ class ChoreParticipationApplicationServiceTest {
         when(enrollmentService.findActiveMembers(chore)).thenReturn(List.of(otherMember));
         when(target.getId()).thenReturn(MEMBER_ID);
         when(chore.getGroup()).thenReturn(group);
+        when(group.timeZone()).thenReturn(java.time.ZoneId.of("Asia/Seoul"));
         when(otherMember.getId()).thenReturn(OTHER_MEMBER_ID);
         when(otherMember.isActive()).thenReturn(true);
         when(otherMember.getGroup()).thenReturn(group);
@@ -150,7 +156,10 @@ class ChoreParticipationApplicationServiceTest {
         when(occurrence.currentAssignee()).thenReturn(Optional.of(target));
         when(occurrence.getEligibilitySnapshotVersion()).thenReturn(2);
         when(occurrence.getStatus()).thenReturn(OccurrenceStatus.ASSIGNED);
-        when(occurrenceRepository.findAllOpenByChoreIdForUpdate(CHORE_ID))
+        when(occurrenceRepository.findAllOpenActiveOnByChoreIdForUpdate(
+                CHORE_ID,
+                java.time.LocalDate.of(2026, 7, 28)
+        ))
                 .thenReturn(List.of(occurrence));
 
         UpdatedChoreParticipations updated = service.update(

@@ -8,6 +8,7 @@ import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 
 import gdg.sharinglog.domain.GroupMember;
 import gdg.sharinglog.domain.OAuthProvider;
@@ -18,6 +19,7 @@ import gdg.sharinglog.domain.rotation.ChoreEligibleMember;
 import gdg.sharinglog.domain.rotation.ChoreEligibilityMode;
 import gdg.sharinglog.domain.rotation.ChoreFrequency;
 import gdg.sharinglog.domain.rotation.ChoreOccurrence;
+import gdg.sharinglog.domain.rotation.AssignmentEndReason;
 import gdg.sharinglog.domain.rotation.NoCandidateReason;
 import gdg.sharinglog.domain.rotation.OccurrenceStatus;
 import gdg.sharinglog.repository.GroupMemberRepository;
@@ -43,6 +45,9 @@ class OccurrenceGenerationServiceTest {
     OccurrenceGenerationService generationService;
 
     @Autowired
+    OccurrencePlanService planService;
+
+    @Autowired
     UserRepository userRepository;
 
     @Autowired
@@ -65,6 +70,71 @@ class OccurrenceGenerationServiceTest {
 
     @Autowired
     RotationDecisionLogRepository decisionLogRepository;
+
+    @Test
+    void persistsCurrentWeekAndFourFutureWeeksAndRegeneratesFuturePlan() {
+        Context context = context("rolling-horizon");
+        Instant generatedAt = Instant.parse("2026-08-03T03:00:00Z");
+        LocalDate currentWeekStart = LocalDate.of(2026, 8, 3);
+        Chore daily = choreRepository.save(Chore.daily(
+                context.group(), context.ownerMembership(), "매일 청소",
+                ChoreEligibilityMode.ALL_ACTIVE_MEMBERS, LocalTime.of(20, 0), generatedAt
+        ));
+        Chore weekly = choreRepository.save(Chore.weekly(
+                context.group(), context.ownerMembership(), "주간 청소",
+                ChoreEligibilityMode.ALL_ACTIVE_MEMBERS, DayOfWeek.SUNDAY,
+                LocalTime.of(20, 0), generatedAt
+        ));
+        Chore biweekly = choreRepository.save(Chore.biweekly(
+                context.group(), context.ownerMembership(), "격주 청소",
+                ChoreEligibilityMode.ALL_ACTIVE_MEMBERS, currentWeekStart,
+                LocalTime.of(20, 0), generatedAt
+        ));
+
+        planService.ensureRollingHorizon(daily, generatedAt);
+        planService.ensureRollingHorizon(weekly, generatedAt);
+        planService.ensureRollingHorizon(biweekly, generatedAt);
+
+        List<ChoreOccurrence> initial = occurrenceRepository.findAll();
+        assertEquals(35, countFor(initial, daily));
+        assertEquals(5, countFor(initial, weekly));
+        assertEquals(3, countFor(initial, biweekly));
+        assertEquals(28, countFutureFor(initial, daily, currentWeekStart.plusWeeks(1)));
+        assertEquals(4, countFutureFor(initial, weekly, currentWeekStart.plusWeeks(1)));
+        assertEquals(2, countFutureFor(initial, biweekly, currentWeekStart.plusWeeks(1)));
+        assertTrue(initial.stream().allMatch(item -> item.getCreatedAt().equals(generatedAt)));
+        assertTrue(assignmentRepository.findAll().stream()
+                .allMatch(item -> item.getAssignedAt().equals(generatedAt)));
+
+        long initialAssignmentCount = assignmentRepository.count();
+        planService.ensureRollingHorizon(daily, generatedAt.plusSeconds(60));
+        assertEquals(initial.size(), occurrenceRepository.count());
+        assertEquals(initialAssignmentCount, assignmentRepository.count());
+
+        Instant regeneratedAt = generatedAt.plusSeconds(120);
+        planService.regenerateFuture(daily, regeneratedAt);
+
+        List<ChoreOccurrence> all = occurrenceRepository.findAll();
+        List<ChoreOccurrence> cancelled = all.stream()
+                .filter(item -> item.getChore().getId().equals(daily.getId()))
+                .filter(item -> item.getStatus() == OccurrenceStatus.CANCELLED)
+                .toList();
+        assertEquals(34, cancelled.size());
+        assertEquals(35, all.stream()
+                .filter(item -> item.getChore().getId().equals(daily.getId()))
+                .filter(item -> item.getStatus() != OccurrenceStatus.CANCELLED)
+                .count());
+        assertTrue(cancelled.stream().allMatch(item -> assignmentRepository
+                .findAllByOccurrence_IdOrderBySequenceNumber(item.getId())
+                .getLast()
+                .getEndReason() == AssignmentEndReason.PLAN_REGENERATED));
+
+        daily.deactivate();
+        planService.cancelFutureForDeactivation(daily, regeneratedAt.plusSeconds(60));
+        assertTrue(occurrenceRepository.findAll().stream()
+                .filter(item -> item.getChore().getId().equals(daily.getId()))
+                .allMatch(item -> item.getStatus() == OccurrenceStatus.CANCELLED));
+    }
 
     @Test
     void createsAndAssignsCurrentOccurrenceIdempotently() {
@@ -302,6 +372,23 @@ class OccurrenceGenerationServiceTest {
         SharingGroup group = groupRepository.save(new SharingGroup("우리 집", owner));
         GroupMember membership = groupMemberRepository.save(GroupMember.owner(group, owner));
         return new Context(group, membership);
+    }
+
+    private long countFor(List<ChoreOccurrence> occurrences, Chore chore) {
+        return occurrences.stream()
+                .filter(item -> item.getChore().getId().equals(chore.getId()))
+                .count();
+    }
+
+    private long countFutureFor(
+            List<ChoreOccurrence> occurrences,
+            Chore chore,
+            LocalDate firstFutureWeek
+    ) {
+        return occurrences.stream()
+                .filter(item -> item.getChore().getId().equals(chore.getId()))
+                .filter(item -> !item.getPeriodStart().isBefore(firstFutureWeek))
+                .count();
     }
 
     private User user(String providerUserId) {

@@ -17,6 +17,7 @@ import gdg.sharinglog.service.invitation.exception.InvitationUnavailableExceptio
 import gdg.sharinglog.service.invitation.result.AcceptedInvitation;
 import gdg.sharinglog.service.invitation.result.InvitationPreview;
 import gdg.sharinglog.service.rotation.enrollment.ChoreEnrollmentService;
+import gdg.sharinglog.service.rotation.occurrence.OccurrencePlanService;
 import gdg.sharinglog.service.user.AuthenticatedUserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.core.user.OAuth2User;
@@ -35,6 +36,7 @@ public class InvitationAcceptanceService {
     private final InvitationCodeHasher codeHasher;
     private final AuthenticatedUserService authenticatedUserService;
     private final ChoreEnrollmentService choreEnrollmentService;
+    private final OccurrencePlanService occurrencePlanService;
 
     @Transactional(readOnly = true)
     public InvitationPreview preview(String rawCode, String registrationId, OAuth2User oAuth2User) {
@@ -80,12 +82,14 @@ public class InvitationAcceptanceService {
             membership.reactivate(acceptedAt);
             GroupMember reactivated = groupMemberRepository.saveAndFlush(membership);
             choreEnrollmentService.activateMemberEnrollments(reactivated, acceptedAt);
+            occurrencePlanService.regenerateGroupFuture(group.getId(), acceptedAt);
             return acceptance(reactivated, true);
         }
 
         GroupMember membership =
                 groupMemberRepository.saveAndFlush(GroupMember.member(group, user));
         choreEnrollmentService.activateMemberEnrollments(membership, acceptedAt);
+        occurrencePlanService.regenerateGroupFuture(group.getId(), acceptedAt);
         return acceptance(membership, true);
     }
 

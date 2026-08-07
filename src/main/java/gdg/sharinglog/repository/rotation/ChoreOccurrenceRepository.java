@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.repository.query.Param;
 
 public interface ChoreOccurrenceRepository extends JpaRepository<ChoreOccurrence, Long> {
@@ -71,26 +72,44 @@ public interface ChoreOccurrenceRepository extends JpaRepository<ChoreOccurrence
     @Query("select occurrence from ChoreOccurrence occurrence where occurrence.id = :occurrenceId")
     Optional<ChoreOccurrence> findByIdForUpdate(@Param("occurrenceId") Long occurrenceId);
 
-    Optional<ChoreOccurrence> findByChore_IdAndScheduleRevisionSnapshotAndPeriodStart(
+    Optional<ChoreOccurrence> findByChore_IdAndScheduleRevisionSnapshotAndPeriodStartAndStatusNot(
             Long choreId,
             long scheduleRevisionSnapshot,
-            LocalDate periodStart
+            LocalDate periodStart,
+            OccurrenceStatus excludedStatus
     );
 
-    Optional<ChoreOccurrence>
-    findFirstByChore_IdAndPeriodStartBeforeOrderByPeriodStartDesc(
-            Long choreId,
-            LocalDate periodStart
+    @Query("""
+            select occurrence
+            from ChoreOccurrence occurrence
+            where occurrence.chore.id = :choreId
+              and occurrence.periodStart < :periodStart
+              and occurrence.status <> gdg.sharinglog.domain.rotation.OccurrenceStatus.CANCELLED
+            order by occurrence.periodStart desc,
+                     occurrence.scheduleRevisionSnapshot desc,
+                     occurrence.id desc
+            """)
+    List<ChoreOccurrence> findAllNonCancelledBefore(
+            @Param("choreId") Long choreId,
+            @Param("periodStart") LocalDate periodStart,
+            Pageable pageable
     );
 
-    Optional<ChoreOccurrence>
-    findFirstByChore_IdAndScheduleRevisionSnapshotOrderByPeriodEndExclusiveDescIdDesc(
-            Long choreId,
-            long scheduleRevisionSnapshot
+    @Query("""
+            select occurrence
+            from ChoreOccurrence occurrence
+            where occurrence.chore.id = :choreId
+              and occurrence.periodStart < :toExclusive
+              and occurrence.periodEndExclusive > :fromInclusive
+              and occurrence.status <> gdg.sharinglog.domain.rotation.OccurrenceStatus.CANCELLED
+            order by occurrence.scheduleRevisionSnapshot desc, occurrence.id desc
+            """)
+    List<ChoreOccurrence> findAllNonCancelledOverlapping(
+            @Param("choreId") Long choreId,
+            @Param("fromInclusive") LocalDate fromInclusive,
+            @Param("toExclusive") LocalDate toExclusive,
+            Pageable pageable
     );
-
-    Optional<ChoreOccurrence>
-    findFirstByChore_IdOrderByPeriodEndExclusiveDescIdDesc(Long choreId);
 
     @EntityGraph(attributePaths = {"chore", "currentAssignment", "currentAssignment.assignee"})
     @Lock(LockModeType.PESSIMISTIC_WRITE)
@@ -113,9 +132,17 @@ public interface ChoreOccurrenceRepository extends JpaRepository<ChoreOccurrence
 
     @EntityGraph(attributePaths = {"chore", "currentAssignment", "currentAssignment.assignee"})
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    List<ChoreOccurrence> findAllByCurrentAssignment_Assignee_IdAndStatusOrderByIdAsc(
-            Long membershipId,
-            OccurrenceStatus status
+    @Query("""
+            select occurrence
+            from ChoreOccurrence occurrence
+            where occurrence.currentAssignment.assignee.id = :membershipId
+              and occurrence.status = gdg.sharinglog.domain.rotation.OccurrenceStatus.ASSIGNED
+              and occurrence.periodStart <= :activeOn
+            order by occurrence.id asc
+            """)
+    List<ChoreOccurrence> findAllCurrentOrPastAssignedToMemberForUpdate(
+            @Param("membershipId") Long membershipId,
+            @Param("activeOn") LocalDate activeOn
     );
 
     @EntityGraph(attributePaths = {
@@ -137,6 +164,24 @@ public interface ChoreOccurrenceRepository extends JpaRepository<ChoreOccurrence
     List<ChoreOccurrence> findAllOpenByChoreIdForUpdate(@Param("choreId") Long choreId);
 
     @EntityGraph(attributePaths = {"chore", "currentAssignment", "currentAssignment.assignee"})
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select occurrence
+            from ChoreOccurrence occurrence
+            where occurrence.chore.id = :choreId
+              and occurrence.periodStart > :activeOn
+              and occurrence.status in (
+                  gdg.sharinglog.domain.rotation.OccurrenceStatus.ASSIGNED,
+                  gdg.sharinglog.domain.rotation.OccurrenceStatus.NEEDS_ATTENTION
+              )
+            order by occurrence.periodStart asc, occurrence.id asc
+            """)
+    List<ChoreOccurrence> findAllFutureOpenByChoreIdForUpdate(
+            @Param("choreId") Long choreId,
+            @Param("activeOn") LocalDate activeOn
+    );
+
+    @EntityGraph(attributePaths = {"chore", "currentAssignment", "currentAssignment.assignee"})
     List<ChoreOccurrence> findAllByChore_Group_IdAndPeriodStartBetweenOrderByPeriodStartAscIdAsc(
             Long groupId,
             LocalDate fromInclusive,
@@ -155,11 +200,34 @@ public interface ChoreOccurrenceRepository extends JpaRepository<ChoreOccurrence
             where occurrence.chore.group.id = :groupId
               and occurrence.periodStart <= :activeOn
               and occurrence.periodEndExclusive > :activeOn
+              and occurrence.status <> gdg.sharinglog.domain.rotation.OccurrenceStatus.CANCELLED
             order by occurrence.frequencySnapshot asc, occurrence.dueAt asc, occurrence.id asc
             """)
     List<ChoreOccurrence> findAllActiveOn(
             @Param("groupId") Long groupId,
             @Param("activeOn") LocalDate activeOn
+    );
+
+    @EntityGraph(attributePaths = {
+            "chore",
+            "currentAssignment",
+            "currentAssignment.assignee",
+            "currentAssignment.assignee.user"
+    })
+    @Query("""
+            select occurrence
+            from ChoreOccurrence occurrence
+            where occurrence.chore.group.id = :groupId
+              and occurrence.chore.active = true
+              and occurrence.status <> gdg.sharinglog.domain.rotation.OccurrenceStatus.CANCELLED
+              and occurrence.periodStart < :toExclusive
+              and occurrence.periodEndExclusive > :fromInclusive
+            order by occurrence.periodStart asc, occurrence.dueAt asc, occurrence.id asc
+            """)
+    List<ChoreOccurrence> findAllPlannedOverlapping(
+            @Param("groupId") Long groupId,
+            @Param("fromInclusive") LocalDate fromInclusive,
+            @Param("toExclusive") LocalDate toExclusive
     );
 
     @EntityGraph(attributePaths = {"chore"})
@@ -175,10 +243,19 @@ public interface ChoreOccurrenceRepository extends JpaRepository<ChoreOccurrence
             "currentAssignment.assignee",
             "currentAssignment.assignee.user"
     })
-    List<ChoreOccurrence>
-    findAllByChore_Group_IdAndStatusAndCurrentAssignment_Assignee_IdOrderByDueAtAsc(
-            Long groupId,
-            OccurrenceStatus status,
-            Long membershipId
+    @Query("""
+            select occurrence
+            from ChoreOccurrence occurrence
+            where occurrence.chore.group.id = :groupId
+              and occurrence.chore.active = true
+              and occurrence.status = gdg.sharinglog.domain.rotation.OccurrenceStatus.ASSIGNED
+              and occurrence.currentAssignment.assignee.id = :membershipId
+              and occurrence.periodStart <= :activeOn
+            order by occurrence.dueAt asc, occurrence.id asc
+            """)
+    List<ChoreOccurrence> findAllAssignedToMemberActiveOn(
+            @Param("groupId") Long groupId,
+            @Param("membershipId") Long membershipId,
+            @Param("activeOn") LocalDate activeOn
     );
 }

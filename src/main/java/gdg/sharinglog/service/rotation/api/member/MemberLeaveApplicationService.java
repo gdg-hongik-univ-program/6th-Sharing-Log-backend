@@ -9,6 +9,7 @@ import gdg.sharinglog.domain.rotation.ChoreOccurrence;
 import gdg.sharinglog.domain.rotation.OccurrenceStatus;
 import gdg.sharinglog.service.rotation.exception.LastOwnerCannotLeaveException;
 import gdg.sharinglog.service.rotation.occurrence.OccurrenceCommandService;
+import gdg.sharinglog.service.rotation.occurrence.OccurrencePlanService;
 import gdg.sharinglog.service.rotation.access.RotationActor;
 import gdg.sharinglog.service.rotation.access.RotationActorAccessService;
 import gdg.sharinglog.web.rotation.RotationViewMapper;
@@ -28,6 +29,7 @@ public class MemberLeaveApplicationService {
 
     private final RotationActorAccessService accessService;
     private final OccurrenceCommandService commandService;
+    private final OccurrencePlanService occurrencePlanService;
     private final RotationViewMapper viewMapper;
 
     @Transactional
@@ -62,6 +64,7 @@ public class MemberLeaveApplicationService {
         List<ChoreOccurrence> affected;
         try {
             affected = commandService.leaveMember(membershipPublicId, leftAt);
+            occurrencePlanService.regenerateGroupFuture(actor.group().getId(), leftAt);
         } catch (LastOwnerCannotLeaveException exception) {
             throw new RotationConflictException(
                     RotationProblemCode.LAST_OWNER_CANNOT_LEAVE,

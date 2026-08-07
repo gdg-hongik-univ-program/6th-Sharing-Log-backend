@@ -20,6 +20,7 @@ import gdg.sharinglog.repository.rotation.ChoreRepository;
 import gdg.sharinglog.repository.rotation.OccurrenceEligibleMemberRepository;
 import gdg.sharinglog.service.rotation.assignment.RotationAssignmentService;
 import gdg.sharinglog.service.rotation.occurrence.OccurrenceCommandService;
+import gdg.sharinglog.service.rotation.occurrence.OccurrencePlanService;
 import gdg.sharinglog.service.rotation.access.RotationActor;
 import gdg.sharinglog.service.rotation.access.RotationActorAccessService;
 import gdg.sharinglog.web.rotation.RotationViewMapper;
@@ -47,6 +48,7 @@ public class OccurrenceActionApplicationService {
     private final OccurrenceEligibleMemberRepository occurrenceEligibleMemberRepository;
     private final OccurrenceCommandService commandService;
     private final RotationAssignmentService assignmentService;
+    private final OccurrencePlanService occurrencePlanService;
     private final RotationViewMapper viewMapper;
 
     @Transactional
@@ -59,6 +61,7 @@ public class OccurrenceActionApplicationService {
             String note,
             Instant actedAt
     ) {
+        Instant effectiveActedAt = Objects.requireNonNull(actedAt, "Action time is required.");
         ActionContext context = requireAssigneeAction(
                 groupPublicId,
                 occurrencePublicId,
@@ -66,12 +69,14 @@ public class OccurrenceActionApplicationService {
                 principal,
                 expectedVersion
         );
+        requireStarted(context.occurrence(), effectiveActedAt);
         ChoreOccurrence occurrence = commandService.complete(
                 occurrencePublicId,
                 context.actor().membership().getPublicId(),
-                actedAt,
+                effectiveActedAt,
                 note
         );
+        occurrencePlanService.regenerateFuture(occurrence.getChore(), effectiveActedAt);
         return response(OccurrenceActionResponse.Outcome.COMPLETED, occurrence, null, null);
     }
 
@@ -109,6 +114,7 @@ public class OccurrenceActionApplicationService {
                 actedAt,
                 note
         );
+        occurrencePlanService.regenerateFuture(reopened.getChore(), actedAt);
         return response(
                 OccurrenceActionResponse.Outcome.COMPLETION_UNDONE,
                 reopened,
@@ -152,6 +158,7 @@ public class OccurrenceActionApplicationService {
                 Objects.requireNonNull(actedAt, "Action time is required.")
         );
         occurrenceRepository.flush();
+        regenerateDownstreamIfStarted(occurrence, actedAt);
 
         OccurrenceActionResponse.Outcome outcome =
                 occurrence.getStatus() == OccurrenceStatus.ASSIGNED
@@ -199,6 +206,31 @@ public class OccurrenceActionApplicationService {
                 .orElseThrow(() -> new RotationNotFoundException(
                         "The occurrence was not found in this group."
                 ));
+    }
+
+    private void requireStarted(ChoreOccurrence occurrence, Instant actedAt) {
+        var actedOn = actedAt
+                .atZone(java.time.ZoneId.of(occurrence.getTimeZoneIdSnapshot()))
+                .toLocalDate();
+        if (actedOn.isBefore(occurrence.getPeriodStart())) {
+            throw new RotationConflictException(
+                    RotationProblemCode.INVALID_OCCURRENCE_STATE,
+                    "A future occurrence cannot be completed.",
+                    Map.of(
+                            "resourceId", occurrence.getPublicId(),
+                            "periodStart", occurrence.getPeriodStart()
+                    )
+            );
+        }
+    }
+
+    private void regenerateDownstreamIfStarted(ChoreOccurrence occurrence, Instant changedAt) {
+        var changedOn = changedAt
+                .atZone(java.time.ZoneId.of(occurrence.getTimeZoneIdSnapshot()))
+                .toLocalDate();
+        if (!occurrence.getPeriodStart().isAfter(changedOn)) {
+            occurrencePlanService.regenerateFuture(occurrence.getChore(), changedAt);
+        }
     }
 
     private void requireVersion(ChoreOccurrence occurrence, long expectedVersion) {

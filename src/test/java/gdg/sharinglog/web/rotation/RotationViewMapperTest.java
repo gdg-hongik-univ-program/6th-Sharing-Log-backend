@@ -47,6 +47,10 @@ class RotationViewMapperTest {
         when(occurrence.getChore()).thenReturn(chore);
         when(chore.getName()).thenReturn("변경된 업무명");
         when(occurrence.getStatus()).thenReturn(OccurrenceStatus.ASSIGNED);
+        when(occurrence.getTimeZoneIdSnapshot()).thenReturn("Asia/Seoul");
+        when(occurrence.getPeriodStart()).thenReturn(java.time.LocalDate.now(
+                java.time.ZoneId.of("Asia/Seoul")
+        ));
         when(occurrence.currentAssignee()).thenReturn(Optional.of(membership));
         when(membership.getId()).thenReturn(10L);
         when(membership.getUser()).thenReturn(user);
@@ -61,6 +65,37 @@ class RotationViewMapperTest {
                         OccurrenceSummaryResponse.AvailableAction.COMPLETE,
                         OccurrenceSummaryResponse.AvailableAction.REQUEST_SUBSTITUTE
                 ),
+                response.availableActions()
+        );
+    }
+
+    @Test
+    void futureOccurrenceOffersSubstituteRequestButNotCompletion() {
+        ChoreOccurrence occurrence = org.mockito.Mockito.mock(ChoreOccurrence.class);
+        Chore chore = org.mockito.Mockito.mock(Chore.class);
+        SharingGroup group = org.mockito.Mockito.mock(SharingGroup.class);
+        GroupMember membership = org.mockito.Mockito.mock(GroupMember.class);
+        User user = org.mockito.Mockito.mock(User.class);
+        RotationActor actor = new RotationActor(group, membership, user);
+
+        when(occurrence.getId()).thenReturn(21L);
+        when(occurrence.getChore()).thenReturn(chore);
+        when(chore.getName()).thenReturn("미래 업무");
+        when(occurrence.getStatus()).thenReturn(OccurrenceStatus.ASSIGNED);
+        when(occurrence.getTimeZoneIdSnapshot()).thenReturn("Asia/Seoul");
+        when(occurrence.getPeriodStart()).thenReturn(java.time.LocalDate.now(
+                java.time.ZoneId.of("Asia/Seoul")
+        ).plusDays(1));
+        when(occurrence.currentAssignee()).thenReturn(Optional.of(membership));
+        when(membership.getId()).thenReturn(10L);
+        when(membership.getUser()).thenReturn(user);
+        when(substituteRequestRepository.findByOccurrence_IdAndActiveMarker(21L, 1))
+                .thenReturn(Optional.empty());
+
+        OccurrenceSummaryResponse response = mapper.occurrence(occurrence, actor);
+
+        assertEquals(
+                List.of(OccurrenceSummaryResponse.AvailableAction.REQUEST_SUBSTITUTE),
                 response.availableActions()
         );
     }

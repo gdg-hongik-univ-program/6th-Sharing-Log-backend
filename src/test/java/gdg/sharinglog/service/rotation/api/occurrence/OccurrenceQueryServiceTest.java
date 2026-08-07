@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDate;
+import java.time.DayOfWeek;
 import java.util.List;
 import java.util.Set;
 
@@ -15,6 +16,7 @@ import gdg.sharinglog.domain.SharingGroup;
 import gdg.sharinglog.domain.User;
 import gdg.sharinglog.domain.rotation.Chore;
 import gdg.sharinglog.domain.rotation.ChoreOccurrence;
+import gdg.sharinglog.domain.rotation.ChoreFrequency;
 import gdg.sharinglog.domain.rotation.OccurrenceStatus;
 import gdg.sharinglog.repository.rotation.ChoreAssignmentAttemptRepository;
 import gdg.sharinglog.repository.rotation.ChoreOccurrenceRepository;
@@ -116,11 +118,12 @@ class OccurrenceQueryServiceTest {
         when(group.getTimeZoneId()).thenReturn("Asia/Seoul");
         when(group.timeZone()).thenReturn(java.time.ZoneId.of("Asia/Seoul"));
         when(membership.getId()).thenReturn(2L);
+        LocalDate activeOn = LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
         when(occurrenceRepository
-                .findAllByChore_Group_IdAndStatusAndCurrentAssignment_Assignee_IdOrderByDueAtAsc(
+                .findAllAssignedToMemberActiveOn(
                         1L,
-                        OccurrenceStatus.ASSIGNED,
-                        2L
+                        2L,
+                        activeOn
                 ))
                 .thenReturn(List.of(soonest, later));
         when(viewMapper.occurrence(soonest, actor)).thenReturn(soonestResponse);
@@ -129,5 +132,53 @@ class OccurrenceQueryServiceTest {
         var response = service.findDueSoon(groupPublicId, "google", principal);
 
         assertEquals(List.of(soonestResponse, laterResponse), response.items());
+    }
+
+    @Test
+    void weeklyPreviewReturnsTheRequestedSevenDayWindow() {
+        String groupPublicId = "group-public-id";
+        OAuth2User principal = mock(OAuth2User.class);
+        SharingGroup group = mock(SharingGroup.class);
+        GroupMember membership = mock(GroupMember.class);
+        User user = mock(User.class);
+        RotationActor actor = new RotationActor(group, membership, user);
+        ChoreOccurrence occurrence = mock(ChoreOccurrence.class);
+        OccurrenceSummaryResponse mapped = mock(OccurrenceSummaryResponse.class);
+        var zone = java.time.ZoneId.of("Asia/Seoul");
+        LocalDate today = LocalDate.now(zone);
+        int daysSinceMonday = Math.floorMod(
+                today.getDayOfWeek().getValue() - DayOfWeek.MONDAY.getValue(),
+                7
+        );
+        LocalDate fromInclusive = today.minusDays(daysSinceMonday).plusWeeks(4);
+        LocalDate toExclusive = fromInclusive.plusWeeks(1);
+
+        when(accessService.requireActiveMember(groupPublicId, "google", principal))
+                .thenReturn(actor);
+        when(group.getId()).thenReturn(1L);
+        when(group.getPublicId()).thenReturn(groupPublicId);
+        when(group.getTimeZoneId()).thenReturn(zone.getId());
+        when(group.timeZone()).thenReturn(zone);
+        when(group.getWeekStartsOn()).thenReturn(DayOfWeek.MONDAY);
+        when(occurrence.getFrequencySnapshot()).thenReturn(ChoreFrequency.WEEKLY);
+        when(occurrenceRepository.findAllPlannedOverlapping(
+                1L,
+                fromInclusive,
+                toExclusive
+        )).thenReturn(List.of(occurrence));
+        when(viewMapper.occurrence(occurrence, actor)).thenReturn(mapped);
+
+        var response = service.findWeeklyPreview(
+                groupPublicId,
+                "google",
+                principal,
+                4,
+                ChoreFrequency.WEEKLY
+        );
+
+        assertEquals(4, response.weekOffset());
+        assertEquals(fromInclusive, response.fromInclusive());
+        assertEquals(toExclusive, response.toExclusive());
+        assertEquals(List.of(mapped), response.items());
     }
 }
