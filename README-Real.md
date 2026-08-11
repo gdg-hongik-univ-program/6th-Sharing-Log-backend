@@ -28,18 +28,23 @@ git stash pop # 임시 저장한 것 꺼내기
 
 #### 프론트와의 연결 관련
 
-8/8 BS 환경변수
+BS 환경변수 (로컬 기준)
 APP_FRONTEND_ORIGIN = http://localhost:5173
-
 APP_OAUTH2_FAILURE_URL = http://localhost:5173/?error=true
 APP_OAUTH2_SUCCESS_URL = http://localhost:5173/
-APP_PUBLIC_BASE_URL = 	
-http://localhost:5173
-SERVER_PORT = 5000
+APP_PUBLIC_BASE_URL = http://localhost:5173
 
+
+BS 환경변수 (배포)
+APP_FRONTEND_ORIGIN = https://6th-sharing-log-frontend-teal.vercel.app
+APP_OAUTH2_FAILURE_URL = https://6th-sharing-log-frontend-teal.vercel.app/?error=true
+APP_OAUTH2_SUCCESS_URL = https://6th-sharing-log-frontend-teal.vercel.app/
+APP_PUBLIC_BASE_URL = https://sharinglog-43-200-12-73.sslip.io
+
+BS 환경변수 공통
+SERVER_PORT = 5000
 SESSION_COOKIE_SAME_SITE = none
 SESSION_COOKIE_SECURE = true
-
 
 상대방 프론트는 API 요청에 credentials: "include"를 사용해야 합니다.
 ------------------------------------------------------------------------------------

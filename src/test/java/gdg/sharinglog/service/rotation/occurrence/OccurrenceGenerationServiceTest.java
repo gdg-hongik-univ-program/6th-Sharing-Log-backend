@@ -8,7 +8,10 @@ import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import gdg.sharinglog.domain.GroupMember;
 import gdg.sharinglog.domain.OAuthProvider;
@@ -30,6 +33,8 @@ import gdg.sharinglog.repository.rotation.ChoreEligibleMemberRepository;
 import gdg.sharinglog.repository.rotation.ChoreOccurrenceRepository;
 import gdg.sharinglog.repository.rotation.ChoreRepository;
 import gdg.sharinglog.repository.rotation.RotationDecisionLogRepository;
+import gdg.sharinglog.service.rotation.assignment.RotationAssignmentService;
+import gdg.sharinglog.service.rotation.enrollment.ChoreEnrollmentService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -46,6 +51,12 @@ class OccurrenceGenerationServiceTest {
 
     @Autowired
     OccurrencePlanService planService;
+
+    @Autowired
+    OccurrenceCommandService commandService;
+
+    @Autowired
+    ChoreEnrollmentService enrollmentService;
 
     @Autowired
     UserRepository userRepository;
@@ -70,6 +81,214 @@ class OccurrenceGenerationServiceTest {
 
     @Autowired
     RotationDecisionLogRepository decisionLogRepository;
+
+    @Test
+    void assignsEveryParticipantOnceBeforeStartingTheNextChoreCycle() {
+        Context context = context("assignment-cycle");
+        GroupMember second = addMember(context, "cycle-second");
+        GroupMember third = addMember(context, "cycle-third");
+        Instant generatedAt = Instant.parse("2026-08-03T03:00:00Z");
+        Chore chore = choreRepository.save(Chore.daily(
+                context.group(),
+                context.ownerMembership(),
+                "매일 공용 청소",
+                ChoreEligibilityMode.ALL_ACTIVE_MEMBERS,
+                LocalTime.of(20, 0),
+                generatedAt.minusSeconds(60)
+        ));
+
+        List<Long> assigneeIds = generationService.ensureOccurrencesUntil(
+                        chore.getId(),
+                        generatedAt,
+                        LocalDate.of(2026, 8, 10)
+                )
+                .stream()
+                .map(occurrence -> occurrence.currentAssignee().orElseThrow().getId())
+                .toList();
+        Set<Long> participants = Set.of(
+                context.ownerMembership().getId(),
+                second.getId(),
+                third.getId()
+        );
+
+        assertEquals(7, assigneeIds.size());
+        assertEquals(participants, Set.copyOf(assigneeIds.subList(0, 3)));
+        assertEquals(participants, Set.copyOf(assigneeIds.subList(3, 6)));
+
+        Map<Long, Integer> counts = new HashMap<>();
+        for (Long assigneeId : assigneeIds) {
+            counts.merge(assigneeId, 1, Integer::sum);
+            int minimum = participants.stream()
+                    .mapToInt(memberId -> counts.getOrDefault(memberId, 0))
+                    .min()
+                    .orElseThrow();
+            int maximum = participants.stream()
+                    .mapToInt(memberId -> counts.getOrDefault(memberId, 0))
+                    .max()
+                    .orElseThrow();
+            assertTrue(maximum - minimum <= 1);
+        }
+        assertTrue(assignmentRepository.findAll().stream()
+                .filter(attempt -> attempt.getOccurrence().getChore().getId().equals(chore.getId()))
+                .allMatch(attempt ->
+                        RotationAssignmentService.ALGORITHM_VERSION.equals(
+                                attempt.getAlgorithmVersion()
+                        )));
+    }
+
+    @Test
+    void lowerValidAssignmentCountInSameFrequencyWinsForANewChore() {
+        Context context = context("same-frequency-count");
+        GroupMember second = addMember(context, "same-frequency-second");
+        Instant historyStartedAt = Instant.parse("2026-08-03T03:00:00Z");
+        Chore historyChore = choreRepository.save(Chore.daily(
+                context.group(),
+                context.ownerMembership(),
+                "기존 일간 업무",
+                ChoreEligibilityMode.ALL_ACTIVE_MEMBERS,
+                LocalTime.of(19, 0),
+                historyStartedAt.minusSeconds(60)
+        ));
+        List<ChoreOccurrence> history = generationService.ensureOccurrencesUntil(
+                historyChore.getId(),
+                historyStartedAt,
+                LocalDate.of(2026, 8, 6)
+        );
+
+        Map<Long, Long> historyCounts = history.stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                        occurrence -> occurrence.currentAssignee().orElseThrow().getId(),
+                        java.util.stream.Collectors.counting()
+                ));
+        Long lowerCountMemberId = List.of(context.ownerMembership(), second).stream()
+                .map(GroupMember::getId)
+                .min(java.util.Comparator.comparingLong(
+                        memberId -> historyCounts.getOrDefault(memberId, 0L)
+                ))
+                .orElseThrow();
+        assertEquals(1L, historyCounts.getOrDefault(lowerCountMemberId, 0L));
+
+        Instant targetAt = Instant.parse("2026-08-06T03:00:00Z");
+        Chore newChore = choreRepository.save(Chore.daily(
+                context.group(),
+                context.ownerMembership(),
+                "새 일간 업무",
+                ChoreEligibilityMode.ALL_ACTIVE_MEMBERS,
+                LocalTime.of(21, 0),
+                targetAt.minusSeconds(60)
+        ));
+        ChoreOccurrence assigned = generationService.ensureCurrentOccurrence(
+                newChore.getId(),
+                targetAt
+        );
+
+        assertEquals(lowerCountMemberId, assigned.currentAssignee().orElseThrow().getId());
+        assertTrue(assignmentRepository
+                .findFirstByOccurrence_IdAndEndedAtIsNull(assigned.getId())
+                .orElseThrow()
+                .getCandidateSnapshot()
+                .contains("decision=HIGHER_VALID_SAME_FREQUENCY_ASSIGNMENT_COUNT"));
+    }
+
+    @Test
+    void lowerCurrentPeriodLoadWinsAfterCycleAndFrequencyCountsTie() {
+        Context context = context("current-period-load");
+        addMember(context, "current-period-second");
+        Instant reference = Instant.parse("2026-08-03T03:00:00Z");
+        Chore firstChore = choreRepository.save(Chore.daily(
+                context.group(), context.ownerMembership(), "첫 업무",
+                ChoreEligibilityMode.ALL_ACTIVE_MEMBERS, LocalTime.of(19, 0),
+                reference.minusSeconds(60)
+        ));
+        Chore secondChore = choreRepository.save(Chore.daily(
+                context.group(), context.ownerMembership(), "두 번째 업무",
+                ChoreEligibilityMode.ALL_ACTIVE_MEMBERS, LocalTime.of(20, 0),
+                reference.minusSeconds(60)
+        ));
+
+        ChoreOccurrence first = generationService.ensureCurrentOccurrence(
+                firstChore.getId(), reference
+        );
+        ChoreOccurrence second = generationService.ensureCurrentOccurrence(
+                secondChore.getId(), reference
+        );
+
+        assertTrue(!first.currentAssignee().orElseThrow().getId().equals(
+                second.currentAssignee().orElseThrow().getId()
+        ));
+    }
+
+    @Test
+    void invalidatedAssignmentDoesNotConsumeAChoreCycleTurn() {
+        Context context = context("invalid-assignment-cycle");
+        addMember(context, "invalid-assignment-second");
+        Instant reference = Instant.parse("2026-08-03T03:00:00Z");
+        Chore chore = choreRepository.save(Chore.daily(
+                context.group(), context.ownerMembership(), "수행 불가 테스트",
+                ChoreEligibilityMode.ALL_ACTIVE_MEMBERS, LocalTime.of(20, 0),
+                reference.minusSeconds(60)
+        ));
+        ChoreOccurrence first = generationService.ensureCurrentOccurrence(chore.getId(), reference);
+        GroupMember invalidatedAssignee = first.currentAssignee().orElseThrow();
+
+        commandService.declineCurrentOccurrence(
+                first.getPublicId(),
+                invalidatedAssignee.getPublicId(),
+                reference.plusSeconds(60)
+        );
+        GroupMember validReplacement = first.currentAssignee().orElseThrow();
+        Instant nextReference = reference.plusSeconds(86_400);
+        LocalDate nextPeriodStart = nextReference
+                .atZone(context.group().timeZone())
+                .toLocalDate();
+
+        assertEquals(0L, assignmentRepository
+                .countValidAssignmentsForChoreAndMemberBeforePeriod(
+                        chore.getId(),
+                        nextPeriodStart,
+                        invalidatedAssignee.getId()
+                ));
+        assertEquals(1L, assignmentRepository
+                .countValidAssignmentsForChoreAndMemberBeforePeriod(
+                        chore.getId(),
+                        nextPeriodStart,
+                        validReplacement.getId()
+                ));
+        ChoreOccurrence next = generationService.ensureCurrentOccurrence(
+                chore.getId(),
+                nextReference
+        );
+
+        assertTrue(!invalidatedAssignee.getId().equals(validReplacement.getId()));
+        assertEquals(invalidatedAssignee.getId(), next.currentAssignee().orElseThrow().getId());
+    }
+
+    @Test
+    void newMemberFairnessCreditIgnoresFuturePlannedAssignments() {
+        Context context = context("future-plan-credit");
+        addMember(context, "future-plan-existing");
+        Instant reference = Instant.parse("2026-08-03T03:00:00Z");
+        Chore chore = choreRepository.save(Chore.daily(
+                context.group(), context.ownerMembership(), "미래 계획 크레딧",
+                ChoreEligibilityMode.ALL_ACTIVE_MEMBERS, LocalTime.of(20, 0),
+                reference.minusSeconds(60)
+        ));
+        List<ChoreOccurrence> planned = generationService.ensureOccurrencesUntil(
+                chore.getId(),
+                reference,
+                LocalDate.of(2026, 8, 10)
+        );
+        assertEquals(7, planned.size());
+
+        GroupMember joining = addMember(context, "future-plan-joining");
+        Instant joinedAt = reference.plusSeconds(60);
+        assertTrue(enrollmentService.addOrReactivate(chore, joining, joinedAt));
+
+        ChoreEligibleMember enrollment = choreEligibleMemberRepository
+                .findByChore_IdAndMember_Id(chore.getId(), joining.getId())
+                .orElseThrow();
+        assertEquals(2L, enrollment.getFairnessCredit());
+    }
 
     @Test
     void persistsCurrentWeekAndFourFutureWeeksAndRegeneratesFuturePlan() {
@@ -372,6 +591,11 @@ class OccurrenceGenerationServiceTest {
         SharingGroup group = groupRepository.save(new SharingGroup("우리 집", owner));
         GroupMember membership = groupMemberRepository.save(GroupMember.owner(group, owner));
         return new Context(group, membership);
+    }
+
+    private GroupMember addMember(Context context, String suffix) {
+        User member = userRepository.save(user(suffix));
+        return groupMemberRepository.save(GroupMember.member(context.group(), member));
     }
 
     private long countFor(List<ChoreOccurrence> occurrences, Chore chore) {

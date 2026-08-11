@@ -219,6 +219,21 @@ class LoginFlowTest {
     }
 
     @Test
+    void rotationOwnerCanReissueInvitationForExistingGroup() throws Exception {
+        mockMvc.perform(get("/rotation.html").with(oauth2Login()))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("id=\"reissue-invitation-button\"")))
+                .andExpect(content().string(containsString("id=\"reissued-invitation-url\"")))
+                .andExpect(content().string(containsString("id=\"reissued-invitation-link\"")))
+                .andExpect(content().string(containsString("id=\"reissue-invitation-status\"")));
+
+        mockMvc.perform(get("/js/rotation.js"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("/invitations/reissue")))
+                .andExpect(content().string(containsString("reissueInvitationButton.disabled = !canManage")));
+    }
+
+    @Test
     void rotationFrontendShowsNewOutboxRequestAndMovesToChangedScheduleTab() throws Exception {
         mockMvc.perform(get("/rotation.html").with(oauth2Login()))
                 .andExpect(status().isOk())

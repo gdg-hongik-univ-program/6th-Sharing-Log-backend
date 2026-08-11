@@ -1,6 +1,7 @@
 package gdg.sharinglog.service.rotation.enrollment;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -154,7 +155,8 @@ public class ChoreEnrollmentService {
         long fairnessCredit = tailFairnessCredit(
                 requiredChore,
                 requiredMember,
-                enrollment == null ? 0L : enrollment.getFairnessCredit()
+                enrollment == null ? 0L : enrollment.getFairnessCredit(),
+                effectiveEnrolledAt
         );
         if (enrollment == null) {
             enrollment = new ChoreEligibleMember(
@@ -210,9 +212,13 @@ public class ChoreEnrollmentService {
     private long tailFairnessCredit(
             Chore chore,
             GroupMember joiningMember,
-            long existingCredit
+            long existingCredit,
+            Instant enrolledAt
     ) {
-        long maximumEffectiveCompleted = -1L;
+        LocalDate enrolledOn = enrolledAt
+                .atZone(chore.getGroup().timeZone())
+                .toLocalDate();
+        long maximumEffectiveAssignments = -1L;
         for (ChoreEligibleMember enrollment :
                 enrollmentRepository.findAllByChore_IdAndEnabledTrueOrderById(chore.getId())) {
             GroupMember enrolledMember = enrollment.getMember();
@@ -221,26 +227,30 @@ public class ChoreEnrollmentService {
                     || !enrollment.belongsToCurrentActivation()) {
                 continue;
             }
-            long actualCompleted = assignmentRepository.countCompletedForChoreAndMember(
-                    chore.getId(),
-                    enrolledMember.getId()
-            );
-            maximumEffectiveCompleted = Math.max(
-                    maximumEffectiveCompleted,
-                    enrollment.effectiveCompletedCount(actualCompleted)
+            long actualAssignments = assignmentRepository
+                    .countValidAssignmentsForChoreAndMemberThroughPeriod(
+                            chore.getId(),
+                            enrolledOn,
+                            enrolledMember.getId()
+                    );
+            maximumEffectiveAssignments = Math.max(
+                    maximumEffectiveAssignments,
+                    enrollment.effectiveAssignmentCount(actualAssignments)
             );
         }
-        if (maximumEffectiveCompleted < 0) {
+        if (maximumEffectiveAssignments < 0) {
             return existingCredit;
         }
 
-        long joiningActualCompleted = assignmentRepository.countCompletedForChoreAndMember(
-                chore.getId(),
-                joiningMember.getId()
-        );
-        long nextTailCount = Math.incrementExact(maximumEffectiveCompleted);
-        long requiredCredit = nextTailCount > joiningActualCompleted
-                ? Math.subtractExact(nextTailCount, joiningActualCompleted)
+        long joiningActualAssignments = assignmentRepository
+                .countValidAssignmentsForChoreAndMemberThroughPeriod(
+                        chore.getId(),
+                        enrolledOn,
+                        joiningMember.getId()
+                );
+        long nextTailCount = Math.incrementExact(maximumEffectiveAssignments);
+        long requiredCredit = nextTailCount > joiningActualAssignments
+                ? Math.subtractExact(nextTailCount, joiningActualAssignments)
                 : 0L;
         return Math.max(existingCredit, requiredCredit);
     }

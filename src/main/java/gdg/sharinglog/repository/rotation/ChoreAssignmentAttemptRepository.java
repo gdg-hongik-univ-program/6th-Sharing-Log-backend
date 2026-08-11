@@ -1,5 +1,6 @@
 package gdg.sharinglog.repository.rotation;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -54,21 +55,88 @@ public interface ChoreAssignmentAttemptRepository
     @Query("""
             select count(attempt)
             from ChoreAssignmentAttempt attempt
+            where attempt.occurrence.chore.id = :choreId
+              and attempt.occurrence.periodStart < :periodStart
+              and attempt.assignee.id = :membershipId
+              and (
+                    attempt.endReason is null
+                    or (
+                         attempt.endReason =
+                         gdg.sharinglog.domain.rotation.AssignmentEndReason.COMPLETED
+                         and attempt.completionRevokedAt is null
+                    )
+              )
+            """)
+    long countValidAssignmentsForChoreAndMemberBeforePeriod(
+            @Param("choreId") Long choreId,
+            @Param("periodStart") LocalDate periodStart,
+            @Param("membershipId") Long membershipId
+    );
+
+    @Query("""
+            select count(attempt)
+            from ChoreAssignmentAttempt attempt
+            where attempt.occurrence.chore.id = :choreId
+              and attempt.occurrence.periodStart <= :periodStart
+              and attempt.assignee.id = :membershipId
+              and (
+                    attempt.endReason is null
+                    or (
+                         attempt.endReason =
+                         gdg.sharinglog.domain.rotation.AssignmentEndReason.COMPLETED
+                         and attempt.completionRevokedAt is null
+                    )
+              )
+            """)
+    long countValidAssignmentsForChoreAndMemberThroughPeriod(
+            @Param("choreId") Long choreId,
+            @Param("periodStart") LocalDate periodStart,
+            @Param("membershipId") Long membershipId
+    );
+
+    @Query("""
+            select count(attempt)
+            from ChoreAssignmentAttempt attempt
+            where attempt.occurrence.chore.group.id = :groupId
+              and attempt.occurrence.frequencySnapshot = :frequency
+              and attempt.occurrence.periodStart < :periodStart
+              and attempt.assignee.id = :membershipId
+              and (
+                    attempt.endReason is null
+                    or (
+                         attempt.endReason =
+                         gdg.sharinglog.domain.rotation.AssignmentEndReason.COMPLETED
+                         and attempt.completionRevokedAt is null
+                    )
+              )
+            """)
+    long countValidAssignmentsForFrequencyAndMemberBeforePeriod(
+            @Param("groupId") Long groupId,
+            @Param("frequency") ChoreFrequency frequency,
+            @Param("periodStart") LocalDate periodStart,
+            @Param("membershipId") Long membershipId
+    );
+
+    @Query("""
+            select count(attempt)
+            from ChoreAssignmentAttempt attempt
             where attempt.occurrence.chore.group.id = :groupId
               and attempt.occurrence.frequencySnapshot = :frequency
               and attempt.occurrence.periodStart = :periodStart
               and attempt.assignee.id = :membershipId
               and (
                     attempt.endReason is null
-                    or attempt.endReason =
-                       gdg.sharinglog.domain.rotation.AssignmentEndReason.COMPLETED
-                       and attempt.completionRevokedAt is null
+                    or (
+                         attempt.endReason =
+                         gdg.sharinglog.domain.rotation.AssignmentEndReason.COMPLETED
+                         and attempt.completionRevokedAt is null
+                    )
               )
             """)
     long countActiveOrCompletedPeriodLoad(
             @Param("groupId") Long groupId,
             @Param("frequency") ChoreFrequency frequency,
-            @Param("periodStart") java.time.LocalDate periodStart,
+            @Param("periodStart") LocalDate periodStart,
             @Param("membershipId") Long membershipId
     );
 }

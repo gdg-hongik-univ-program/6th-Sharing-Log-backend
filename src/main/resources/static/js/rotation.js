@@ -27,6 +27,10 @@
     const manageStatus = document.querySelector("#manage-rotation-status");
     const saveParticipationsButton = document.querySelector("#save-member-participations");
     const removeMemberButton = document.querySelector("#remove-group-member");
+    const reissueInvitationButton = document.querySelector("#reissue-invitation-button");
+    const reissuedInvitationUrl = document.querySelector("#reissued-invitation-url");
+    const reissuedInvitationLink = document.querySelector("#reissued-invitation-link");
+    const reissueInvitationStatus = document.querySelector("#reissue-invitation-status");
 
     const editChoreDialog = document.querySelector("#edit-chore-dialog");
     const editChoreForm = document.querySelector("#edit-chore-form");
@@ -87,6 +91,7 @@
     );
     manageMemberSelect.addEventListener("change", renderSelectedMemberManagement);
     removeMemberButton.addEventListener("click", () => void removeSelectedMember());
+    reissueInvitationButton.addEventListener("click", () => void reissueInvitation());
 
     frequencyInput.addEventListener("change", syncScheduleFields);
     editChoreFrequency.addEventListener("change", syncEditScheduleFields);
@@ -306,6 +311,38 @@
         canManage = response.canManage === true;
         managementMembers = Array.isArray(response.items) ? response.items : [];
         openManageButton.hidden = !canManage;
+        reissueInvitationButton.disabled = !canManage;
+    }
+
+    async function reissueInvitation() {
+        if (!canManage) {
+            return;
+        }
+
+        reissueInvitationButton.disabled = true;
+        reissuedInvitationUrl.value = "";
+        reissuedInvitationLink.href = "#";
+        reissuedInvitationLink.hidden = true;
+        reissueInvitationStatus.textContent = "새 초대 코드를 발급하는 중...";
+
+        try {
+            const invitation = await mutate(`${groupPath}/invitations/reissue`);
+            const inviteUrl = new URL(invitation.inviteUrl, window.location.origin);
+            if (inviteUrl.protocol !== "http:" && inviteUrl.protocol !== "https:") {
+                throw new Error("초대 링크 주소가 올바르지 않습니다.");
+            }
+
+            reissuedInvitationUrl.value = inviteUrl.href;
+            reissuedInvitationLink.href = inviteUrl.href;
+            reissuedInvitationLink.hidden = false;
+            reissueInvitationStatus.textContent =
+                `새 초대 코드가 발급되었습니다. `
+                + `${new Date(invitation.expiresAt).toLocaleString("ko-KR")}까지 사용할 수 있습니다.`;
+        } catch (error) {
+            reissueInvitationStatus.textContent = errorMessage(error);
+        } finally {
+            reissueInvitationButton.disabled = !canManage;
+        }
     }
 
     async function openManagement() {

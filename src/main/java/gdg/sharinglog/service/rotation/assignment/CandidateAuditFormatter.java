@@ -13,15 +13,24 @@ final class CandidateAuditFormatter {
 
     static String snapshot(List<CandidateSnapshot> candidates) {
         return candidates.stream()
-                .map(candidate -> "%d|active=%s|eligible=%s|declined=%s|completed=%d|credit=%d|effectiveCompleted=%d|load=%d|previous=%s|decision=%s"
+                .map(candidate -> (
+                        "%d|active=%s|eligible=%s|declined=%s"
+                                + "|sameChoreActualValidAssignments=%d"
+                                + "|fairnessCredit=%d"
+                                + "|sameChoreEffectiveValidAssignments=%d"
+                                + "|sameFrequencyValidAssignments=%d"
+                                + "|activePeriodLoad=%d"
+                                + "|previous=%s|decision=%s"
+                )
                         .formatted(
                                 candidate.membershipId(),
                                 candidate.active(),
                                 candidate.eligible(),
                                 candidate.declinedCurrentOccurrence(),
-                                candidate.completedSameChoreCount(),
+                                candidate.validSameChoreAssignmentCount(),
                                 candidate.fairnessCredit(),
-                                candidate.effectiveCompletedSameChoreCount(),
+                                candidate.effectiveValidSameChoreAssignmentCount(),
+                                candidate.validSameFrequencyAssignmentCount(),
                                 candidate.activePeriodLoad(),
                                 candidate.previousAssignee(),
                                 candidate.decision()

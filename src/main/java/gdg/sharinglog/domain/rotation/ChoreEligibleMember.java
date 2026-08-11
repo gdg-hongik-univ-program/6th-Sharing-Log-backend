@@ -112,11 +112,11 @@ public class ChoreEligibleMember {
         return memberActivationGeneration == member.getActivationGeneration();
     }
 
-    public long effectiveCompletedCount(long actualCompletedCount) {
-        if (actualCompletedCount < 0) {
-            throw new IllegalArgumentException("실제 완료 횟수는 음수일 수 없습니다.");
+    public long effectiveAssignmentCount(long actualAssignmentCount) {
+        if (actualAssignmentCount < 0) {
+            throw new IllegalArgumentException("실제 유효 할당 횟수는 음수일 수 없습니다.");
         }
-        return Math.addExact(actualCompletedCount, fairnessCredit);
+        return Math.addExact(actualAssignmentCount, fairnessCredit);
     }
 
     private static void requireActive(GroupMember member) {

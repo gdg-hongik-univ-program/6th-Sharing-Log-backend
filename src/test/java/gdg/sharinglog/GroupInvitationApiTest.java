@@ -22,6 +22,7 @@ import java.util.regex.Pattern;
 
 import gdg.sharinglog.domain.GroupInvitation;
 import gdg.sharinglog.domain.GroupMember;
+import gdg.sharinglog.domain.MemberStatus;
 import gdg.sharinglog.domain.OAuthProvider;
 import gdg.sharinglog.domain.SharingGroup;
 import gdg.sharinglog.domain.User;
@@ -137,6 +138,152 @@ class GroupInvitationApiTest {
         List<GroupInvitation> invitations = invitationRepository.findAll();
         assertEquals(2, invitations.size());
         assertNotEquals(invitations.get(0).getCodeHash(), invitations.get(1).getCodeHash());
+    }
+
+    @Test
+    void ownerReissuesInvitationForExistingGroupAndNewMemberCanJoin() throws Exception {
+        String expiredCode = "AbCdEfGhIjKlMnOpQrStUv";
+        Instant requestStartedAt = Instant.now();
+        invitationRepository.save(new GroupInvitation(
+                group,
+                owner,
+                codeHasher.hash(expiredCode),
+                requestStartedAt.minus(Duration.ofHours(25)),
+                requestStartedAt.minus(Duration.ofHours(1))
+        ));
+
+        MvcResult result = mockMvc.perform(post(
+                                "/api/groups/{groupId}/invitations/reissue",
+                                group.getPublicId()
+                        )
+                        .with(csrf())
+                        .with(oauthUser(OWNER_PROVIDER_ID)))
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Location", startsWith("https://sharing.example/invite/")))
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.groupId").value(group.getId()))
+                .andExpect(jsonPath("$.code", matchesPattern("[A-Za-z0-9_-]{22}")))
+                .andExpect(jsonPath("$.inviteUrl", startsWith("https://sharing.example/invite/")))
+                .andReturn();
+
+        String reissuedCode = responseCode(result);
+        List<GroupInvitation> invitations = invitationRepository.findAllByGroup_Id(group.getId());
+        assertEquals(2, invitations.size());
+        assertTrue(invitations.stream().noneMatch(invitation -> invitation.isUsableAt(requestStartedAt)
+                && invitation.getCodeHash().equals(codeHasher.hash(expiredCode))));
+
+        GroupInvitation reissued = invitations.stream()
+                .filter(invitation -> invitation.getCodeHash().equals(codeHasher.hash(reissuedCode)))
+                .findFirst()
+                .orElseThrow();
+        assertTrue(reissued.isUsableAt(Instant.now()));
+        assertTrue(!reissued.getExpiresAt().isBefore(requestStartedAt.plus(Duration.ofHours(24))));
+        assertTrue(reissued.getExpiresAt().isBefore(requestStartedAt.plus(Duration.ofHours(25))));
+
+        mockMvc.perform(post("/api/invitations/{code}/accept", reissuedCode)
+                        .with(csrf())
+                        .with(oauthUser(NON_MEMBER_PROVIDER_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.groupPublicId").value(group.getPublicId()))
+                .andExpect(jsonPath("$.joinedNow").value(true));
+
+        User joinedUser = userRepository
+                .findByProviderAndProviderUserId(OAuthProvider.GOOGLE, NON_MEMBER_PROVIDER_ID)
+                .orElseThrow();
+        assertTrue(groupMemberRepository
+                .findByGroup_IdAndUser_IdAndStatus(
+                        group.getId(),
+                        joinedUser.getId(),
+                        MemberStatus.ACTIVE
+                )
+                .isPresent());
+    }
+
+    @Test
+    void reissueKeepsExistingActiveInvitationUsableUntilItsOwnExpiry() throws Exception {
+        MvcResult initialResult = mockMvc.perform(
+                        post("/api/groups/{groupId}/invitations", group.getId())
+                                .with(csrf())
+                                .with(oauthUser(OWNER_PROVIDER_ID)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        MvcResult reissuedResult = mockMvc.perform(post(
+                                "/api/groups/{groupId}/invitations/reissue",
+                                group.getPublicId()
+                        )
+                        .with(csrf())
+                        .with(oauthUser(OWNER_PROVIDER_ID)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String initialCode = responseCode(initialResult);
+        String reissuedCode = responseCode(reissuedResult);
+        assertNotEquals(initialCode, reissuedCode);
+
+        mockMvc.perform(get("/api/invitations/{code}", initialCode)
+                        .with(oauthUser(NON_MEMBER_PROVIDER_ID)))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/invitations/{code}", reissuedCode)
+                        .with(oauthUser(NON_MEMBER_PROVIDER_ID)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void regularMemberCannotReissueInvitationForExistingGroup() throws Exception {
+        mockMvc.perform(post(
+                                "/api/groups/{groupId}/invitations/reissue",
+                                group.getPublicId()
+                        )
+                        .with(csrf())
+                        .with(oauthUser(MEMBER_PROVIDER_ID)))
+                .andExpect(status().isForbidden());
+
+        assertTrue(invitationRepository.findAll().isEmpty());
+    }
+
+    @Test
+    void nonMemberCannotReissueInvitationForExistingGroup() throws Exception {
+        mockMvc.perform(post(
+                                "/api/groups/{groupId}/invitations/reissue",
+                                group.getPublicId()
+                        )
+                        .with(csrf())
+                        .with(oauthUser(NON_MEMBER_PROVIDER_ID)))
+                .andExpect(status().isForbidden());
+
+        assertTrue(invitationRepository.findAll().isEmpty());
+    }
+
+    @Test
+    void leftOwnerCannotReissueInvitationForExistingGroup() throws Exception {
+        GroupMember ownerMembership = groupMemberRepository
+                .findByGroup_IdAndUser_Id(group.getId(), owner.getId())
+                .orElseThrow();
+        ownerMembership.leave(Instant.now());
+        groupMemberRepository.saveAndFlush(ownerMembership);
+
+        mockMvc.perform(post(
+                                "/api/groups/{groupId}/invitations/reissue",
+                                group.getPublicId()
+                        )
+                        .with(csrf())
+                        .with(oauthUser(OWNER_PROVIDER_ID)))
+                .andExpect(status().isForbidden());
+
+        assertTrue(invitationRepository.findAll().isEmpty());
+    }
+
+    @Test
+    void missingExistingGroupCannotReissueInvitation() throws Exception {
+        mockMvc.perform(post(
+                                "/api/groups/{groupId}/invitations/reissue",
+                                "11111111-1111-4111-8111-111111111111"
+                        )
+                        .with(csrf())
+                        .with(oauthUser(OWNER_PROVIDER_ID)))
+                .andExpect(status().isNotFound());
+
+        assertTrue(invitationRepository.findAll().isEmpty());
     }
 
     @Test

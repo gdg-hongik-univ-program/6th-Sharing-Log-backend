@@ -41,7 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class RotationAssignmentService {
 
-    public static final String ALGORITHM_VERSION = "fair-random-v2";
+    public static final String ALGORITHM_VERSION = "fair-random-v3";
     private final SharingGroupRepository sharingGroupRepository;
     private final GroupMemberRepository groupMemberRepository;
     private final ChoreOccurrenceRepository occurrenceRepository;
@@ -236,10 +236,19 @@ public class RotationAssignmentService {
             long fairnessCredit,
             boolean previousAssignee
     ) {
-        long completedSameChoreCount = assignmentRepository.countCompletedForChoreAndMember(
-                occurrence.getChore().getId(),
-                member.getId()
-        );
+        long validSameChoreAssignmentCount = assignmentRepository
+                .countValidAssignmentsForChoreAndMemberBeforePeriod(
+                        occurrence.getChore().getId(),
+                        occurrence.getPeriodStart(),
+                        member.getId()
+                );
+        long validSameFrequencyAssignmentCount = assignmentRepository
+                .countValidAssignmentsForFrequencyAndMemberBeforePeriod(
+                        occurrence.getChore().getGroup().getId(),
+                        occurrence.getFrequencySnapshot(),
+                        occurrence.getPeriodStart(),
+                        member.getId()
+                );
         long activePeriodLoad = assignmentRepository.countActiveOrCompletedPeriodLoad(
                 occurrence.getChore().getGroup().getId(),
                 occurrence.getFrequencySnapshot(),
@@ -258,8 +267,9 @@ public class RotationAssignmentService {
                 member.isActive(),
                 eligible,
                 declinedOrSubstituted,
-                completedSameChoreCount,
+                validSameChoreAssignmentCount,
                 fairnessCredit,
+                validSameFrequencyAssignmentCount,
                 Math.toIntExact(activePeriodLoad),
                 previousAssignee
         );
