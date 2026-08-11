@@ -255,6 +255,34 @@
                aria-live="polite"></p>
 
             <hr class="dialog-divider">
+            <section aria-labelledby="manage-invitation-title">
+                <h3 id="manage-invitation-title">멤버 초대</h3>
+                <p class="form-help">
+                    기존 하우스에 새 멤버를 초대할 코드를 발급합니다. 새 링크는 발급 후 24시간 동안 사용할 수 있습니다.
+                    기존에 발급한 링크는 원래 만료 시각까지 계속 사용할 수 있습니다.
+                </p>
+                <button id="reissue-invitation-button"
+                        class="secondary-button"
+                        type="button"
+                        disabled>
+                    초대 코드 새로 발급
+                </button>
+                <label for="reissued-invitation-url">새 초대 링크
+                    <input id="reissued-invitation-url" type="text" readonly>
+                </label>
+                <a id="reissued-invitation-link"
+                   class="secondary-link"
+                   href="#"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   hidden>초대 링크 열기</a>
+                <p id="reissue-invitation-status"
+                   class="rotation-status"
+                   role="status"
+                   aria-live="polite"></p>
+            </section>
+
+            <hr class="dialog-divider">
             <section aria-labelledby="manage-chores-title">
                 <h3 id="manage-chores-title">업무 관리</h3>
                 <p class="form-help">업무를 비활성화해도 이미 생성된 회차와 과거 이력은 유지됩니다.</p>

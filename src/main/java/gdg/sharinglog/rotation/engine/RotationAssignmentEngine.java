@@ -61,21 +61,39 @@ public final class RotationAssignmentEngine {
             );
         }
 
-        long minimumCompletedCount = finalists.stream()
-                .mapToLong(RotationCandidate::effectiveCompletedSameChoreCount)
+        long minimumEffectiveValidSameChoreAssignmentCount = finalists.stream()
+                .mapToLong(RotationCandidate::effectiveValidSameChoreAssignmentCount)
                 .min()
                 .orElseThrow();
         eliminate(
                 finalists,
                 decisions,
                 candidate ->
-                        candidate.effectiveCompletedSameChoreCount() > minimumCompletedCount,
-                CandidateDecision.HIGHER_COMPLETED_SAME_CHORE_COUNT
+                        candidate.effectiveValidSameChoreAssignmentCount()
+                                > minimumEffectiveValidSameChoreAssignmentCount,
+                CandidateDecision.HIGHER_EFFECTIVE_VALID_SAME_CHORE_ASSIGNMENT_COUNT
         );
         reasons.add(reason(
-                SelectionReasonCode.MINIMUM_SAME_CHORE_COMPLETION_COUNT,
-                "Kept candidates with the minimum effective same-chore completion count of "
-                        + minimumCompletedCount
+                SelectionReasonCode.MINIMUM_EFFECTIVE_VALID_SAME_CHORE_ASSIGNMENT_COUNT,
+                "Kept candidates with the minimum effective valid same-chore assignment "
+                        + "count of " + minimumEffectiveValidSameChoreAssignmentCount
+        ));
+
+        long minimumValidSameFrequencyAssignmentCount = finalists.stream()
+                .mapToLong(RotationCandidate::validSameFrequencyAssignmentCount)
+                .min()
+                .orElseThrow();
+        eliminate(
+                finalists,
+                decisions,
+                candidate -> candidate.validSameFrequencyAssignmentCount()
+                        > minimumValidSameFrequencyAssignmentCount,
+                CandidateDecision.HIGHER_VALID_SAME_FREQUENCY_ASSIGNMENT_COUNT
+        );
+        reasons.add(reason(
+                SelectionReasonCode.MINIMUM_VALID_SAME_FREQUENCY_ASSIGNMENT_COUNT,
+                "Kept candidates with the minimum valid same-frequency assignment count of "
+                        + minimumValidSameFrequencyAssignmentCount
         ));
 
         int minimumActivePeriodLoad = finalists.stream()

@@ -151,14 +151,68 @@ class RotationPersistenceTest {
         );
     }
 
+    @Test
+    void validAssignmentCountsIncludeActiveAndEffectiveCompletionOnly() {
+        assignedOccurrence(LocalDate.of(2026, 7, 23));
+
+        ChoreOccurrence completed = assignedOccurrence(LocalDate.of(2026, 7, 24));
+        completed.complete(Instant.parse("2026-07-24T10:00:00Z"));
+
+        ChoreOccurrence revokedCompletion = assignedOccurrence(LocalDate.of(2026, 7, 25));
+        revokedCompletion.complete(Instant.parse("2026-07-25T10:00:00Z"));
+        ChoreAssignmentAttempt revokedAttempt = assignmentRepository
+                .findAllByOccurrence_IdOrderBySequenceNumber(revokedCompletion.getId())
+                .getFirst();
+        revokedAttempt.revokeCompletion(
+                ownerMembership,
+                Instant.parse("2026-07-25T11:00:00Z"),
+                "완료 취소"
+        );
+
+        ChoreOccurrence regenerated = assignedOccurrence(LocalDate.of(2026, 7, 26));
+        regenerated.cancelForPlanRegeneration(Instant.parse("2026-07-26T11:00:00Z"));
+
+        entityManager.flush();
+
+        LocalDate targetPeriod = LocalDate.of(2026, 7, 27);
+        assertEquals(2L, assignmentRepository
+                .countValidAssignmentsForChoreAndMemberBeforePeriod(
+                        chore.getId(),
+                        targetPeriod,
+                        ownerMembership.getId()
+                ));
+        assertEquals(2L, assignmentRepository
+                .countValidAssignmentsForFrequencyAndMemberBeforePeriod(
+                        chore.getGroup().getId(),
+                        chore.getFrequency(),
+                        targetPeriod,
+                        ownerMembership.getId()
+                ));
+    }
+
     private ChoreOccurrence occurrence() {
+        return occurrence(LocalDate.of(2026, 7, 23));
+    }
+
+    private ChoreOccurrence occurrence(LocalDate periodStart) {
         return ChoreOccurrence.create(
                 chore,
-                LocalDate.of(2026, 7, 23),
-                LocalDate.of(2026, 7, 24),
-                Instant.parse("2026-07-23T12:00:00Z"),
-                Instant.parse("2026-07-22T15:00:00Z")
+                periodStart,
+                periodStart.plusDays(1),
+                periodStart.atTime(chore.getDueTime())
+                        .atZone(chore.getGroup().timeZone())
+                        .toInstant(),
+                periodStart.minusDays(1)
+                        .atStartOfDay(chore.getGroup().timeZone())
+                        .toInstant()
         );
+    }
+
+    private ChoreOccurrence assignedOccurrence(LocalDate periodStart) {
+        ChoreOccurrence occurrence = occurrenceRepository.save(occurrence(periodStart));
+        ChoreAssignmentAttempt attempt = assignmentRepository.save(assignment(occurrence, 1));
+        occurrence.assign(attempt);
+        return occurrence;
     }
 
     private ChoreAssignmentAttempt assignment(ChoreOccurrence occurrence, int sequence) {
@@ -167,7 +221,10 @@ class RotationPersistenceTest {
                 ownerMembership,
                 sequence,
                 sequence == 1 ? AssignmentTrigger.INITIAL : AssignmentTrigger.NEEDS_ATTENTION_RETRY,
-                Instant.parse("2026-07-23T00:00:00Z").plusSeconds(sequence),
+                occurrence.getPeriodStart()
+                        .atStartOfDay(chore.getGroup().timeZone())
+                        .toInstant()
+                        .plusSeconds(sequence),
                 "fair-random-v1",
                 42L,
                 "[{\"membershipId\":\"" + ownerMembership.getPublicId() + "\"}]",

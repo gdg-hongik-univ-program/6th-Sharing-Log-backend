@@ -337,23 +337,32 @@ API는 사용자 계정 ID나 이메일 대신 그룹 멤버십의 공개 UUID�
       "trigger": "INITIAL",
       "decidedAt": "2026-07-20T00:00:01Z",
       "outcome": "ASSIGNED",
-      "algorithmVersion": "fair-random-v2",
+      "algorithmVersion": "fair-random-v3",
       "decisionSeed": "5932104873210042",
       "selectionReasonCodes": [
         "ACTIVE_ELIGIBLE_NOT_DECLINED_FILTER",
+        "MINIMUM_EFFECTIVE_VALID_SAME_CHORE_ASSIGNMENT_COUNT",
+        "MINIMUM_VALID_SAME_FREQUENCY_ASSIGNMENT_COUNT",
+        "MINIMUM_ACTIVE_PERIOD_LOAD",
         "RANDOM_TIE_BREAK"
       ],
       "candidates": [
         {
           "membershipId": "44444444-4444-4444-8444-444444444444",
-          "completedSameChoreCount": 1,
+          "validSameChoreAssignmentCount": 1,
+          "fairnessCredit": 0,
+          "effectiveValidSameChoreAssignmentCount": 1,
+          "validSameFrequencyAssignmentCount": 3,
           "activePeriodLoad": 0,
           "previousAssignee": false,
           "decision": "SELECTED"
         },
         {
           "membershipId": "55555555-5555-4555-8555-555555555555",
-          "completedSameChoreCount": 1,
+          "validSameChoreAssignmentCount": 1,
+          "fairnessCredit": 0,
+          "effectiveValidSameChoreAssignmentCount": 1,
+          "validSameFrequencyAssignmentCount": 3,
           "activePeriodLoad": 0,
           "previousAssignee": false,
           "decision": "RANDOM_TIE_NOT_SELECTED"
@@ -367,16 +376,22 @@ API는 사용자 계정 ID나 이메일 대신 그룹 멤버십의 공개 UUID�
       "trigger": "DECLINE_REASSIGNMENT",
       "decidedAt": "2026-07-23T13:55:00Z",
       "outcome": "ASSIGNED",
-      "algorithmVersion": "fair-random-v2",
+      "algorithmVersion": "fair-random-v3",
       "decisionSeed": "7439128746501234",
       "selectionReasonCodes": [
         "ACTIVE_ELIGIBLE_NOT_DECLINED_FILTER",
+        "MINIMUM_EFFECTIVE_VALID_SAME_CHORE_ASSIGNMENT_COUNT",
+        "MINIMUM_VALID_SAME_FREQUENCY_ASSIGNMENT_COUNT",
+        "MINIMUM_ACTIVE_PERIOD_LOAD",
         "SOLE_FINALIST"
       ],
       "candidates": [
         {
           "membershipId": "55555555-5555-4555-8555-555555555555",
-          "completedSameChoreCount": 1,
+          "validSameChoreAssignmentCount": 1,
+          "fairnessCredit": 0,
+          "effectiveValidSameChoreAssignmentCount": 1,
+          "validSameFrequencyAssignmentCount": 3,
           "activePeriodLoad": 0,
           "previousAssignee": false,
           "decision": "SELECTED"
@@ -409,11 +424,11 @@ API는 사용자 계정 ID나 이메일 대신 그룹 멤버십의 공개 UUID�
 |---|---|
 | 회차 상태 | `ASSIGNED`, `COMPLETED`, `SKIPPED`, `NEEDS_ATTENTION` |
 | 배정 계기 | `INITIAL`, `DECLINE_REASSIGNMENT`, `MEMBER_LEFT_REASSIGNMENT`, `NEEDS_ATTENTION_RETRY`, `PARTICIPATION_CHANGE_REASSIGNMENT`, `PARTICIPATION_CHANGE_RETRY`, `SUBSTITUTE_ACCEPTANCE`, `COMPLETION_REOPENED` |
-| 배정 종료 사유 | `COMPLETED`, `SKIPPED_ALREADY_DONE`, `DECLINED_BY_ASSIGNEE`, `ASSIGNEE_LEFT_GROUP`, `PARTICIPATION_REMOVED`, `SUBSTITUTE_ACCEPTED` |
+| 배정 종료 사유 | `COMPLETED`, `SKIPPED_ALREADY_DONE`, `DECLINED_BY_ASSIGNEE`, `ASSIGNEE_LEFT_GROUP`, `PARTICIPATION_REMOVED`, `SUBSTITUTE_ACCEPTED`, `PLAN_REGENERATED` |
 | 결정 결과 | `ASSIGNED`, `NO_CANDIDATE` |
 | 후보 제외 사유 | `INACTIVE`, `NOT_ELIGIBLE`, `DECLINED_CURRENT_OCCURRENCE` |
 
-`decisionSeed`는 JavaScript의 안전 정수 범위를 넘을 수 있으므로 문자열로 응답한다. 자동 배정은 `fair-random-v2`, 대타 수락과 완료 취소 복원은 `manual-action-v1` 및 seed `0`으로 기록한다. 배정 핵심 이력은 삭제하거나 덮어쓰지 않으며 완료 취소 메타데이터만 추가한다.
+`decisionSeed`는 JavaScript의 안전 정수 범위를 넘을 수 있으므로 문자열로 응답한다. 자동 배정은 `fair-random-v3`, 대타 수락과 완료 취소 복원은 `manual-action-v1` 및 seed `0`으로 기록한다. `fair-random-v3`는 업무별 사이클, 같은 반복 주기의 과거 유효 할당 수, 현재 기간 업무량, 직전 담당 여부 순으로 후보를 좁힌다. 배정 핵심 이력은 삭제하거나 덮어쓰지 않으며 완료 취소 메타데이터만 추가한다.
 
 ## 4. 엔드포인트 요약
 
