@@ -9,6 +9,7 @@ import gdg.sharinglog.service.group.GroupService;
 import gdg.sharinglog.web.dto.CreateGroupRequest;
 import gdg.sharinglog.web.dto.GroupResponse;
 import gdg.sharinglog.web.dto.MyGroupResponse;
+import gdg.sharinglog.web.dto.PromoteMemberResponse;
 import gdg.sharinglog.web.dto.UpdateGroupRequest;
 import gdg.sharinglog.web.dto.UpdateGroupResponse;
 import jakarta.validation.Valid;
@@ -68,6 +69,20 @@ public class GroupController {
                 groupId,
                 request.name(),
                 request.address(),
+                authentication.getAuthorizedClientRegistrationId(),
+                authentication.getPrincipal()
+        )));
+    }
+
+    @PostMapping("/{groupId}/members/{membershipId}/promote")
+    public ResponseEntity<PromoteMemberResponse> promoteMember(
+            @PathVariable String groupId,
+            @PathVariable String membershipId,
+            OAuth2AuthenticationToken authentication
+    ) {
+        return ResponseEntity.ok(PromoteMemberResponse.from(groupService.promoteMember(
+                groupId,
+                membershipId,
                 authentication.getAuthorizedClientRegistrationId(),
                 authentication.getPrincipal()
         )));

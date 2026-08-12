@@ -281,23 +281,25 @@ class GroupCreationApiTest {
     }
 
     @Test
-    void ownerCannotDeleteGroupWhenAnotherActiveMemberRemains() throws Exception {
+    void ownerDeletesGroupAndRemainingMembersAreMarkedLeft() throws Exception {
         SharingGroup group = groupRepository.save(new SharingGroup("함께 사는 집", creator));
         groupMemberRepository.save(GroupMember.owner(group, creator));
         User member = userRepository.save(User.builder()
                 .provider(OAuthProvider.GOOGLE)
                 .providerUserId("group-delete-member-id")
                 .build());
-        groupMemberRepository.save(GroupMember.member(group, member));
+        GroupMember remainingMembership = groupMemberRepository.save(GroupMember.member(group, member));
 
         mockMvc.perform(delete("/api/groups/{groupId}", group.getPublicId())
                         .with(csrf())
                         .with(oauth2Login()
                                 .clientRegistration(googleClientRegistration())
                                 .attributes(attributes -> attributes.put("sub", GOOGLE_USER_ID))))
-                .andExpect(status().isConflict());
+                .andExpect(status().isNoContent());
 
-        assertNull(group.getDeletedAt());
+        assertTrue(groupRepository.findByPublicId(group.getPublicId()).isEmpty());
+        GroupMember reloaded = groupMemberRepository.findById(remainingMembership.getId()).orElseThrow();
+        assertEquals(MemberStatus.LEFT, reloaded.getStatus());
     }
 
     @Test
@@ -318,6 +320,76 @@ class GroupCreationApiTest {
                 .andExpect(status().isForbidden());
 
         assertNull(group.getDeletedAt());
+    }
+
+    @Test
+    void ownerPromotesMemberToOwner() throws Exception {
+        SharingGroup group = groupRepository.save(new SharingGroup("함께 사는 집", creator));
+        groupMemberRepository.save(GroupMember.owner(group, creator));
+        User member = userRepository.save(User.builder()
+                .provider(OAuthProvider.GOOGLE)
+                .providerUserId("group-promote-member-id")
+                .build());
+        GroupMember membership = groupMemberRepository.save(GroupMember.member(group, member));
+
+        mockMvc.perform(post(
+                        "/api/groups/{groupId}/members/{membershipId}/promote",
+                        group.getPublicId(),
+                        membership.getPublicId()
+                )
+                        .with(csrf())
+                        .with(oauth2Login()
+                                .clientRegistration(googleClientRegistration())
+                                .attributes(attributes -> attributes.put("sub", GOOGLE_USER_ID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.membershipPublicId").value(membership.getPublicId()))
+                .andExpect(jsonPath("$.role").value("OWNER"));
+
+        assertEquals(GroupRole.OWNER, groupMemberRepository.findById(membership.getId()).orElseThrow().getRole());
+    }
+
+    @Test
+    void regularMemberCannotPromoteAnotherMember() throws Exception {
+        User owner = userRepository.save(User.builder()
+                .provider(OAuthProvider.GOOGLE)
+                .providerUserId("group-promote-owner-id")
+                .build());
+        SharingGroup group = groupRepository.save(new SharingGroup("함께 사는 집", owner));
+        groupMemberRepository.save(GroupMember.owner(group, owner));
+        GroupMember requesterMembership = groupMemberRepository.save(GroupMember.member(group, creator));
+
+        mockMvc.perform(post(
+                        "/api/groups/{groupId}/members/{membershipId}/promote",
+                        group.getPublicId(),
+                        requesterMembership.getPublicId()
+                )
+                        .with(csrf())
+                        .with(oauth2Login()
+                                .clientRegistration(googleClientRegistration())
+                                .attributes(attributes -> attributes.put("sub", GOOGLE_USER_ID))))
+                .andExpect(status().isForbidden());
+
+        assertEquals(
+                GroupRole.MEMBER,
+                groupMemberRepository.findById(requesterMembership.getId()).orElseThrow().getRole()
+        );
+    }
+
+    @Test
+    void promotingUnknownMemberReturnsNotFound() throws Exception {
+        SharingGroup group = groupRepository.save(new SharingGroup("함께 사는 집", creator));
+        groupMemberRepository.save(GroupMember.owner(group, creator));
+
+        mockMvc.perform(post(
+                        "/api/groups/{groupId}/members/{membershipId}/promote",
+                        group.getPublicId(),
+                        "unknown-membership-id"
+                )
+                        .with(csrf())
+                        .with(oauth2Login()
+                                .clientRegistration(googleClientRegistration())
+                                .attributes(attributes -> attributes.put("sub", GOOGLE_USER_ID))))
+                .andExpect(status().isNotFound());
     }
 
     private ClientRegistration googleClientRegistration() {
