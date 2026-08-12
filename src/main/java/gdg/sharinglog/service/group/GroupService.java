@@ -1,6 +1,7 @@
 package gdg.sharinglog.service.group;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 
 import gdg.sharinglog.domain.GroupMember;
@@ -13,9 +14,10 @@ import gdg.sharinglog.repository.GroupInvitationRepository;
 import gdg.sharinglog.repository.GroupMemberRepository;
 import gdg.sharinglog.repository.SharingGroupRepository;
 import gdg.sharinglog.service.group.exception.GroupMemberAccessDeniedException;
-import gdg.sharinglog.service.group.exception.GroupDeletionConflictException;
+import gdg.sharinglog.service.group.exception.GroupMemberNotFoundException;
 import gdg.sharinglog.service.group.exception.GroupNotFoundException;
 import gdg.sharinglog.service.group.result.CreatedGroup;
+import gdg.sharinglog.service.group.result.PromotedMember;
 import gdg.sharinglog.service.group.result.UpdatedGroup;
 import gdg.sharinglog.service.rotation.occurrence.OccurrenceCommandService;
 import gdg.sharinglog.service.rotation.occurrence.OccurrencePlanService;
@@ -110,6 +112,43 @@ public class GroupService {
     }
 
     @Transactional
+    public PromotedMember promoteMember(
+            String groupPublicId,
+            String membershipPublicId,
+            String registrationId,
+            OAuth2User oAuth2User
+    ) {
+        User requester = authenticatedUserService.requireUser(registrationId, oAuth2User);
+        SharingGroup group = groupRepository.findByPublicId(groupPublicId)
+                .orElseThrow(() -> new GroupNotFoundException(groupPublicId));
+        GroupMember requesterMembership = groupMemberRepository
+                .findByGroup_IdAndUser_IdAndStatus(
+                        group.getId(),
+                        requester.getId(),
+                        MemberStatus.ACTIVE
+                )
+                .orElseThrow(() -> new GroupMemberAccessDeniedException(
+                        "활성 그룹 멤버만 다른 멤버를 관리자로 승격할 수 있습니다."
+                ));
+        if (requesterMembership.getRole() != GroupRole.OWNER) {
+            throw new GroupMemberAccessDeniedException(
+                    "그룹 관리자만 다른 멤버를 관리자로 승격할 수 있습니다."
+            );
+        }
+        GroupMember target = groupMemberRepository
+                .findByPublicIdAndGroup_PublicIdAndStatus(
+                        membershipPublicId,
+                        groupPublicId,
+                        MemberStatus.ACTIVE
+                )
+                .orElseThrow(() -> new GroupMemberNotFoundException(membershipPublicId));
+
+        target.promoteToOwner();
+
+        return new PromotedMember(target.getPublicId(), target.getRole());
+    }
+
+    @Transactional
     public void deleteGroup(
             String groupPublicId,
             String registrationId,
@@ -130,18 +169,20 @@ public class GroupService {
                 ));
         if (membership.getRole() != GroupRole.OWNER) {
             throw new GroupMemberAccessDeniedException(
-                    "그룹 OWNER만 그룹을 삭제할 수 있습니다."
+                    "그룹 관리자만 그룹을 삭제할 수 있습니다."
             );
-        }
-        if (groupMemberRepository.existsByGroup_IdAndStatusAndIdNot(
-                group.getId(),
-                MemberStatus.ACTIVE,
-                membership.getId()
-        )) {
-            throw new GroupDeletionConflictException();
         }
 
         Instant effectiveDeletedAt = Objects.requireNonNull(deletedAt, "그룹 삭제 시각은 필수입니다.");
+        List<GroupMember> remainingActiveMembers = groupMemberRepository
+                .findAllByGroup_IdAndStatusOrderById(group.getId(), MemberStatus.ACTIVE)
+                .stream()
+                .filter(member -> !member.getId().equals(membership.getId()))
+                .toList();
+        for (GroupMember remainingMember : remainingActiveMembers) {
+            remainingMember.leave(effectiveDeletedAt);
+        }
+
         occurrenceCommandService.leaveMember(membership.getPublicId(), effectiveDeletedAt);
         occurrencePlanService.cancelGroupFuture(group.getId(), effectiveDeletedAt);
         for (GroupInvitation invitation : groupInvitationRepository.findAllByGroup_Id(group.getId())) {

@@ -122,4 +122,11 @@ public class GroupMember {
         this.joinedAt = effectiveRejoinedAt;
         this.leftAt = null;
     }
+
+    public void promoteToOwner() {
+        if (!isActive()) {
+            throw new IllegalStateException("활성 멤버만 관리자로 승격할 수 있습니다.");
+        }
+        this.role = GroupRole.OWNER;
+    }
 }
