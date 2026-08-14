@@ -41,7 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class RotationAssignmentService {
 
-    public static final String ALGORITHM_VERSION = "fair-random-v3";
+    public static final String ALGORITHM_VERSION = "fair-random-v4";
     private final SharingGroupRepository sharingGroupRepository;
     private final GroupMemberRepository groupMemberRepository;
     private final ChoreOccurrenceRepository occurrenceRepository;

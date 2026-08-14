@@ -61,6 +61,22 @@ public final class RotationAssignmentEngine {
             );
         }
 
+        int minimumActivePeriodLoad = finalists.stream()
+                .mapToInt(RotationCandidate::activePeriodLoad)
+                .min()
+                .orElseThrow();
+        eliminate(
+                finalists,
+                decisions,
+                candidate -> candidate.activePeriodLoad() > minimumActivePeriodLoad,
+                CandidateDecision.HIGHER_ACTIVE_PERIOD_LOAD
+        );
+        reasons.add(reason(
+                SelectionReasonCode.MINIMUM_ACTIVE_PERIOD_LOAD,
+                "Kept candidates with the minimum active-period load of "
+                        + minimumActivePeriodLoad
+        ));
+
         long minimumEffectiveValidSameChoreAssignmentCount = finalists.stream()
                 .mapToLong(RotationCandidate::effectiveValidSameChoreAssignmentCount)
                 .min()
@@ -94,22 +110,6 @@ public final class RotationAssignmentEngine {
                 SelectionReasonCode.MINIMUM_VALID_SAME_FREQUENCY_ASSIGNMENT_COUNT,
                 "Kept candidates with the minimum valid same-frequency assignment count of "
                         + minimumValidSameFrequencyAssignmentCount
-        ));
-
-        int minimumActivePeriodLoad = finalists.stream()
-                .mapToInt(RotationCandidate::activePeriodLoad)
-                .min()
-                .orElseThrow();
-        eliminate(
-                finalists,
-                decisions,
-                candidate -> candidate.activePeriodLoad() > minimumActivePeriodLoad,
-                CandidateDecision.HIGHER_ACTIVE_PERIOD_LOAD
-        );
-        reasons.add(reason(
-                SelectionReasonCode.MINIMUM_ACTIVE_PERIOD_LOAD,
-                "Kept candidates with the minimum active-period load of "
-                        + minimumActivePeriodLoad
         ));
 
         boolean hasPreviousAssignee = finalists.stream().anyMatch(RotationCandidate::previousAssignee);

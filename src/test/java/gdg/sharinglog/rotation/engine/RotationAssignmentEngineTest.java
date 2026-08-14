@@ -51,11 +51,29 @@ class RotationAssignmentEngineTest {
     }
 
     @Test
-    void minimumEffectiveValidSameChoreCountHasPriorityOverAllLaterCriteria() {
+    void minimumActivePeriodLoadHasPriorityOverCycleFrequencyAndPreviousAssignee() {
         RotationAssignmentResult.Assigned result = assigned(
                 deterministicEngine(),
                 List.of(
                         candidate(1, true, true, false, 1, 9, 9, true),
+                        candidate(2, true, true, false, 2, 0, 0, false)
+                )
+        );
+
+        assertEquals(2L, result.selectedMembershipId());
+        assertDecisions(result, Map.of(
+                1L, HIGHER_ACTIVE_PERIOD_LOAD,
+                2L, SELECTED
+        ));
+        assertReason(result, MINIMUM_ACTIVE_PERIOD_LOAD);
+    }
+
+    @Test
+    void minimumEffectiveValidSameChoreCountHasPriorityAfterPeriodLoadTies() {
+        RotationAssignmentResult.Assigned result = assigned(
+                deterministicEngine(),
+                List.of(
+                        candidate(1, true, true, false, 1, 9, 0, true),
                         candidate(2, true, true, false, 2, 0, 0, false)
                 )
         );
@@ -73,7 +91,7 @@ class RotationAssignmentEngineTest {
         RotationAssignmentResult.Assigned result = assigned(
                 deterministicEngine(),
                 List.of(
-                        candidateWithCredit(1, 2, 0, 4, 1, false),
+                        candidateWithCredit(1, 2, 0, 4, 0, false),
                         candidateWithCredit(2, 0, 3, 0, 0, false)
                 )
         );
@@ -93,11 +111,11 @@ class RotationAssignmentEngineTest {
     }
 
     @Test
-    void minimumValidSameFrequencyCountHasPriorityOverPeriodLoadAndPreviousAssignee() {
+    void minimumValidSameFrequencyCountHasPriorityAfterEarlierCountsTie() {
         RotationAssignmentResult.Assigned result = assigned(
                 deterministicEngine(),
                 List.of(
-                        candidate(1, true, true, false, 2, 0, 9, true),
+                        candidate(1, true, true, false, 2, 0, 0, true),
                         candidate(2, true, true, false, 2, 1, 0, false)
                 )
         );
@@ -148,7 +166,7 @@ class RotationAssignmentEngineTest {
         RotationAssignmentResult.Assigned result = assigned(
                 deterministicEngine(),
                 List.of(
-                        candidate(1, true, true, false, 0, 9, 9, true),
+                        candidate(1, true, true, false, 0, 9, 0, true),
                         candidate(2, true, true, false, 1, 0, 0, false)
                 )
         );

@@ -219,6 +219,63 @@ class OccurrenceGenerationServiceTest {
     }
 
     @Test
+    void weeklyChoresUseDifferentAssigneesInEachWeekWhenEnoughMembersExist() {
+        Context context = context("weekly-period-distribution");
+        GroupMember second = addMember(context, "weekly-period-second");
+        GroupMember third = addMember(context, "weekly-period-third");
+        Instant generatedAt = Instant.parse("2026-08-03T03:00:00Z");
+        List<Chore> chores = choreRepository.saveAllAndFlush(List.of(
+                Chore.weekly(
+                        context.group(), context.ownerMembership(), "weekly-a",
+                        ChoreEligibilityMode.ALL_ACTIVE_MEMBERS, DayOfWeek.SUNDAY,
+                        LocalTime.of(19, 0), generatedAt.minusSeconds(60)
+                ),
+                Chore.weekly(
+                        context.group(), context.ownerMembership(), "weekly-b",
+                        ChoreEligibilityMode.ALL_ACTIVE_MEMBERS, DayOfWeek.SUNDAY,
+                        LocalTime.of(20, 0), generatedAt.minusSeconds(60)
+                ),
+                Chore.weekly(
+                        context.group(), context.ownerMembership(), "weekly-c",
+                        ChoreEligibilityMode.ALL_ACTIVE_MEMBERS, DayOfWeek.SUNDAY,
+                        LocalTime.of(21, 0), generatedAt.minusSeconds(60)
+                )
+        ));
+
+        chores.forEach(chore -> planService.ensureRollingHorizon(chore, generatedAt));
+
+        Set<Long> participants = Set.of(
+                context.ownerMembership().getId(),
+                second.getId(),
+                third.getId()
+        );
+        Map<LocalDate, List<Long>> assigneesByWeek = occurrenceRepository.findAll().stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                        ChoreOccurrence::getPeriodStart,
+                        java.util.LinkedHashMap::new,
+                        java.util.stream.Collectors.mapping(
+                                occurrence -> occurrence.currentAssignee().orElseThrow().getId(),
+                                java.util.stream.Collectors.toList()
+                        )
+                ));
+
+        assertEquals(5, assigneesByWeek.size());
+        assigneesByWeek.values().forEach(assignees -> {
+            assertEquals(3, assignees.size());
+            assertEquals(participants, Set.copyOf(assignees));
+        });
+        chores.forEach(chore -> {
+            List<Long> firstCycle = occurrenceRepository.findAll().stream()
+                    .filter(occurrence -> occurrence.getChore().getId().equals(chore.getId()))
+                    .sorted(java.util.Comparator.comparing(ChoreOccurrence::getPeriodStart))
+                    .limit(3)
+                    .map(occurrence -> occurrence.currentAssignee().orElseThrow().getId())
+                    .toList();
+            assertEquals(participants, Set.copyOf(firstCycle));
+        });
+    }
+
+    @Test
     void invalidatedAssignmentDoesNotConsumeAChoreCycleTurn() {
         Context context = context("invalid-assignment-cycle");
         addMember(context, "invalid-assignment-second");
