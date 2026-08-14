@@ -337,13 +337,13 @@ API는 사용자 계정 ID나 이메일 대신 그룹 멤버십의 공개 UUID�
       "trigger": "INITIAL",
       "decidedAt": "2026-07-20T00:00:01Z",
       "outcome": "ASSIGNED",
-      "algorithmVersion": "fair-random-v3",
+      "algorithmVersion": "fair-random-v4",
       "decisionSeed": "5932104873210042",
       "selectionReasonCodes": [
         "ACTIVE_ELIGIBLE_NOT_DECLINED_FILTER",
+        "MINIMUM_ACTIVE_PERIOD_LOAD",
         "MINIMUM_EFFECTIVE_VALID_SAME_CHORE_ASSIGNMENT_COUNT",
         "MINIMUM_VALID_SAME_FREQUENCY_ASSIGNMENT_COUNT",
-        "MINIMUM_ACTIVE_PERIOD_LOAD",
         "RANDOM_TIE_BREAK"
       ],
       "candidates": [
@@ -376,13 +376,13 @@ API는 사용자 계정 ID나 이메일 대신 그룹 멤버십의 공개 UUID�
       "trigger": "DECLINE_REASSIGNMENT",
       "decidedAt": "2026-07-23T13:55:00Z",
       "outcome": "ASSIGNED",
-      "algorithmVersion": "fair-random-v3",
+      "algorithmVersion": "fair-random-v4",
       "decisionSeed": "7439128746501234",
       "selectionReasonCodes": [
         "ACTIVE_ELIGIBLE_NOT_DECLINED_FILTER",
+        "MINIMUM_ACTIVE_PERIOD_LOAD",
         "MINIMUM_EFFECTIVE_VALID_SAME_CHORE_ASSIGNMENT_COUNT",
         "MINIMUM_VALID_SAME_FREQUENCY_ASSIGNMENT_COUNT",
-        "MINIMUM_ACTIVE_PERIOD_LOAD",
         "SOLE_FINALIST"
       ],
       "candidates": [
@@ -428,7 +428,7 @@ API는 사용자 계정 ID나 이메일 대신 그룹 멤버십의 공개 UUID�
 | 결정 결과 | `ASSIGNED`, `NO_CANDIDATE` |
 | 후보 제외 사유 | `INACTIVE`, `NOT_ELIGIBLE`, `DECLINED_CURRENT_OCCURRENCE` |
 
-`decisionSeed`는 JavaScript의 안전 정수 범위를 넘을 수 있으므로 문자열로 응답한다. 자동 배정은 `fair-random-v3`, 대타 수락과 완료 취소 복원은 `manual-action-v1` 및 seed `0`으로 기록한다. `fair-random-v3`는 업무별 사이클, 같은 반복 주기의 과거 유효 할당 수, 현재 기간 업무량, 직전 담당 여부 순으로 후보를 좁힌다. 배정 핵심 이력은 삭제하거나 덮어쓰지 않으며 완료 취소 메타데이터만 추가한다.
+`decisionSeed`는 JavaScript의 안전 정수 범위를 넘을 수 있으므로 문자열로 응답한다. 자동 배정은 `fair-random-v4`, 대타 수락과 완료 취소 복원은 `manual-action-v1` 및 seed `0`으로 기록한다. `fair-random-v4`는 같은 반복 주기의 현재 기간 업무량, 업무별 사이클, 같은 반복 주기의 과거 유효 할당 수, 직전 담당 여부 순으로 후보를 좁힌다. 따라서 같은 주기·같은 기간에는 아직 배정되지 않은 가능 멤버를 먼저 선택하고, 중복이 불가피하면 가능 후보 안에서 기간 내 업무량 편차를 최소화한다. 배정 핵심 이력은 삭제하거나 덮어쓰지 않으며 완료 취소 메타데이터만 추가한다.
 
 ## 4. 엔드포인트 요약
 
