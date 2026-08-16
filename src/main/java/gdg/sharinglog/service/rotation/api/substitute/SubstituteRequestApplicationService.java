@@ -22,6 +22,7 @@ import gdg.sharinglog.repository.rotation.ChoreOccurrenceRepository;
 import gdg.sharinglog.repository.rotation.OccurrenceEligibleMemberRepository;
 import gdg.sharinglog.repository.rotation.SubstituteRequestRecipientRepository;
 import gdg.sharinglog.repository.rotation.SubstituteRequestRepository;
+import gdg.sharinglog.service.push.PushNotifier;
 import gdg.sharinglog.service.rotation.assignment.DirectAssignmentService;
 import gdg.sharinglog.service.rotation.access.RotationActor;
 import gdg.sharinglog.service.rotation.access.RotationActorAccessService;
@@ -49,6 +50,7 @@ public class SubstituteRequestApplicationService {
     private final SubstituteRequestRecipientRepository recipientRepository;
     private final DirectAssignmentService directAssignmentService;
     private final RotationViewMapper viewMapper;
+    private final PushNotifier pushNotifier;
 
     @Transactional
     public SubstituteRequestResponse create(
@@ -123,7 +125,21 @@ public class SubstituteRequestApplicationService {
                         .map(member -> new SubstituteRequestRecipient(request, member))
                         .toList()
         );
+        notifyRecipientsOfNewRequest(request, actor, recipients);
         return response(request, actor);
+    }
+
+    private void notifyRecipientsOfNewRequest(
+            SubstituteRequest request,
+            RotationActor actor,
+            List<GroupMember> recipients
+    ) {
+        String requesterName = viewMapper.member(actor.membership()).displayName();
+        String choreName = request.getOccurrence().getChoreNameSnapshot();
+        String body = requesterName + "님이 '" + choreName + "' 대타를 요청했어요";
+        for (GroupMember recipient : recipients) {
+            pushNotifier.notifyUser(recipient.getUser().getId(), "대타 요청", body, "/notification");
+        }
     }
 
     @Transactional(readOnly = true)
