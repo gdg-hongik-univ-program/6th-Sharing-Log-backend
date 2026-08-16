@@ -43,6 +43,8 @@ dependencies {
     implementation 'software.amazon.awssdk:s3:2.41.31' // S3 의존성 추가
 
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3' // swagger
+
+    implementation 'nl.martijndwars:web-push:5.1.1' // Web Push(VAPID) 전송
 }
 
 tasks.named('test') {
