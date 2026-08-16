@@ -1,5 +1,6 @@
 package gdg.sharinglog.repository.rotation;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -250,12 +251,14 @@ public interface ChoreOccurrenceRepository extends JpaRepository<ChoreOccurrence
               and occurrence.chore.active = true
               and occurrence.status = gdg.sharinglog.domain.rotation.OccurrenceStatus.ASSIGNED
               and occurrence.currentAssignment.assignee.id = :membershipId
-              and occurrence.periodStart <= :activeOn
+              and occurrence.dueAt >= :fromInclusive
+              and occurrence.dueAt <= :toInclusive
             order by occurrence.dueAt asc, occurrence.id asc
             """)
-    List<ChoreOccurrence> findAllAssignedToMemberActiveOn(
+    List<ChoreOccurrence> findAllAssignedToMemberDueBetween(
             @Param("groupId") Long groupId,
             @Param("membershipId") Long membershipId,
-            @Param("activeOn") LocalDate activeOn
+            @Param("fromInclusive") Instant fromInclusive,
+            @Param("toInclusive") Instant toInclusive
     );
 }

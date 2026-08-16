@@ -36,6 +36,11 @@ import lombok.NoArgsConstructor;
 @Entity
 public class GroupMember {
 
+    public static final int DEFAULT_DUE_SOON_HOURS = 5;
+    public static final int MAX_DAILY_DUE_SOON_HOURS = 24;
+    public static final int MAX_WEEKLY_DUE_SOON_HOURS = 168;
+    public static final int MAX_BIWEEKLY_DUE_SOON_HOURS = 336;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", updatable = false)
@@ -77,6 +82,15 @@ public class GroupMember {
     @Column(name = "activation_generation", nullable = false)
     private long activationGeneration;
 
+    @Column(name = "daily_due_soon_hours", nullable = false)
+    private int dailyDueSoonHours;
+
+    @Column(name = "weekly_due_soon_hours", nullable = false)
+    private int weeklyDueSoonHours;
+
+    @Column(name = "biweekly_due_soon_hours", nullable = false)
+    private int biweeklyDueSoonHours;
+
     @Version
     @Column(name = "version", nullable = false)
     private long version;
@@ -89,6 +103,9 @@ public class GroupMember {
         this.status = MemberStatus.ACTIVE;
         this.joinedAt = Instant.now();
         this.activationGeneration = 1L;
+        this.dailyDueSoonHours = DEFAULT_DUE_SOON_HOURS;
+        this.weeklyDueSoonHours = DEFAULT_DUE_SOON_HOURS;
+        this.biweeklyDueSoonHours = DEFAULT_DUE_SOON_HOURS;
     }
 
     public static GroupMember owner(SharingGroup group, User user) {
@@ -128,5 +145,39 @@ public class GroupMember {
             throw new IllegalStateException("활성 멤버만 관리자로 승격할 수 있습니다.");
         }
         this.role = GroupRole.OWNER;
+    }
+
+    public void updateDueSoonNotificationHours(
+            int dailyHours,
+            int weeklyHours,
+            int biweeklyHours
+    ) {
+        int validatedDailyHours = requireDueSoonHours(
+                dailyHours,
+                MAX_DAILY_DUE_SOON_HOURS,
+                "매일"
+        );
+        int validatedWeeklyHours = requireDueSoonHours(
+                weeklyHours,
+                MAX_WEEKLY_DUE_SOON_HOURS,
+                "매주"
+        );
+        int validatedBiweeklyHours = requireDueSoonHours(
+                biweeklyHours,
+                MAX_BIWEEKLY_DUE_SOON_HOURS,
+                "격주"
+        );
+        this.dailyDueSoonHours = validatedDailyHours;
+        this.weeklyDueSoonHours = validatedWeeklyHours;
+        this.biweeklyDueSoonHours = validatedBiweeklyHours;
+    }
+
+    private int requireDueSoonHours(int hours, int maximum, String frequencyLabel) {
+        if (hours < 1 || hours > maximum) {
+            throw new IllegalArgumentException(
+                    frequencyLabel + " 마감 임박 알림 시간은 1~" + maximum + "시간이어야 합니다."
+            );
+        }
+        return hours;
     }
 }

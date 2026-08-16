@@ -1,7 +1,10 @@
 package gdg.sharinglog.service.rotation.api.occurrence;
 
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 import gdg.sharinglog.domain.GroupMember;
@@ -81,15 +84,30 @@ public class OccurrenceQueryService {
             String registrationId,
             OAuth2User principal
     ) {
+        return findDueSoon(groupPublicId, registrationId, principal, Instant.now());
+    }
+
+    OccurrenceListResponse findDueSoon(
+            String groupPublicId,
+            String registrationId,
+            OAuth2User principal,
+            Instant referenceTime
+    ) {
         RotationActor actor =
                 accessService.requireActiveMember(groupPublicId, registrationId, principal);
-        LocalDate activeOn = LocalDate.now(actor.group().timeZone());
+        Instant now = Objects.requireNonNull(referenceTime, "기준 시각은 필수입니다.");
+        LocalDate activeOn = now.atZone(actor.group().timeZone()).toLocalDate();
+        int maximumHoursBeforeDue = maximumHoursBeforeDue(actor.membership());
         List<ChoreOccurrence> occurrences = occurrenceRepository
-                .findAllAssignedToMemberActiveOn(
+                .findAllAssignedToMemberDueBetween(
                         actor.group().getId(),
                         actor.membership().getId(),
-                        activeOn
-                );
+                        now,
+                        now.plus(maximumHoursBeforeDue, ChronoUnit.HOURS)
+                )
+                .stream()
+                .filter(item -> isDueSoon(item, actor.membership(), now))
+                .toList();
         return new OccurrenceListResponse(
                 actor.group().getPublicId(),
                 null,
@@ -140,6 +158,33 @@ public class OccurrenceQueryService {
                         .map(item -> viewMapper.occurrence(item, actor))
                         .toList()
         );
+    }
+
+    private int maximumHoursBeforeDue(GroupMember membership) {
+        return Math.max(
+                membership.getDailyDueSoonHours(),
+                Math.max(
+                        membership.getWeeklyDueSoonHours(),
+                        membership.getBiweeklyDueSoonHours()
+                )
+        );
+    }
+
+    private boolean isDueSoon(
+            ChoreOccurrence occurrence,
+            GroupMember membership,
+            Instant referenceTime
+    ) {
+        Instant dueAt = occurrence.getDueAt();
+        if (dueAt.isBefore(referenceTime)) {
+            return false;
+        }
+        int hoursBeforeDue = switch (occurrence.getFrequencySnapshot()) {
+            case DAILY -> membership.getDailyDueSoonHours();
+            case WEEKLY -> membership.getWeeklyDueSoonHours();
+            case BIWEEKLY -> membership.getBiweeklyDueSoonHours();
+        };
+        return !dueAt.isAfter(referenceTime.plus(hoursBeforeDue, ChronoUnit.HOURS));
     }
 
     @Transactional(readOnly = true)

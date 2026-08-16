@@ -1,6 +1,6 @@
 package gdg.sharinglog.service.rotation.api.substitute;
 
-import static gdg.sharinglog.domain.rotation.AssignmentEndReason.SAME_OCCURRENCE_EXCLUSIONS;
+import static gdg.sharinglog.domain.rotation.AssignmentEndReason.SUBSTITUTE_REQUEST_RECIPIENT_EXCLUSIONS;
 
 import java.time.Instant;
 import java.util.List;
@@ -23,7 +23,6 @@ import gdg.sharinglog.repository.rotation.OccurrenceEligibleMemberRepository;
 import gdg.sharinglog.repository.rotation.SubstituteRequestRecipientRepository;
 import gdg.sharinglog.repository.rotation.SubstituteRequestRepository;
 import gdg.sharinglog.service.rotation.assignment.DirectAssignmentService;
-import gdg.sharinglog.service.rotation.occurrence.OccurrencePlanService;
 import gdg.sharinglog.service.rotation.access.RotationActor;
 import gdg.sharinglog.service.rotation.access.RotationActorAccessService;
 import gdg.sharinglog.web.rotation.RotationViewMapper;
@@ -49,7 +48,6 @@ public class SubstituteRequestApplicationService {
     private final SubstituteRequestRepository requestRepository;
     private final SubstituteRequestRecipientRepository recipientRepository;
     private final DirectAssignmentService directAssignmentService;
-    private final OccurrencePlanService occurrencePlanService;
     private final RotationViewMapper viewMapper;
 
     @Transactional
@@ -66,16 +64,24 @@ public class SubstituteRequestApplicationService {
                 accessService.requireActiveMemberForUpdate(groupPublicId, registrationId, principal);
         ChoreOccurrence occurrence = lockedOccurrence(groupPublicId, occurrencePublicId);
         requireVersion(occurrence.getPublicId(), expectedOccurrenceVersion, occurrence.getVersion());
-        requireAssignedToActor(occurrence, actor);
-        if (requestRepository
-                .findByOccurrence_IdAndActiveMarker(occurrence.getId(), 1)
-                .isPresent()) {
+        var activeRequest = requestRepository
+                .findByOccurrence_IdAndActiveMarker(occurrence.getId(), 1);
+        if (activeRequest.isPresent()) {
+            if (!activeRequest.get().requester().getId()
+                    .equals(actor.membership().getId())) {
+                throw new RotationForbiddenException(
+                        RotationProblemCode.SUBSTITUTE_REQUESTED_BY_ANOTHER_MEMBER,
+                        "다른 사용자가 올린 대타 요청입니다",
+                        Map.of("resourceId", occurrencePublicId)
+                );
+            }
             throw conflict(
                     RotationProblemCode.SUBSTITUTE_REQUEST_ALREADY_EXISTS,
                     "An active substitute request already exists for this assignment.",
                     occurrencePublicId
             );
         }
+        requireAssignedToActor(occurrence, actor);
 
         List<GroupMember> recipients = eligibilityRepository
                 .findAllByOccurrence_IdAndSnapshotVersionOrderById(
@@ -91,7 +97,7 @@ public class SubstituteRequestApplicationService {
                         .existsByOccurrence_IdAndAssignee_IdAndEndReasonIn(
                                 occurrence.getId(),
                                 member.getId(),
-                                SAME_OCCURRENCE_EXCLUSIONS
+                                SUBSTITUTE_REQUEST_RECIPIENT_EXCLUSIONS
                         ))
                 .toList();
         if (recipients.isEmpty()) {
@@ -218,12 +224,6 @@ public class SubstituteRequestApplicationService {
         recipientRepository.saveAll(allRecipients);
         request.accept(acceptedAssignment, effectiveAcceptedAt);
         requestRepository.saveAndFlush(request);
-        var acceptedOn = effectiveAcceptedAt
-                .atZone(java.time.ZoneId.of(occurrence.getTimeZoneIdSnapshot()))
-                .toLocalDate();
-        if (!occurrence.getPeriodStart().isAfter(acceptedOn)) {
-            occurrencePlanService.regenerateFuture(occurrence.getChore(), effectiveAcceptedAt);
-        }
         return response(request, actor);
     }
 

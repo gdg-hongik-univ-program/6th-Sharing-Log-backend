@@ -1,6 +1,7 @@
 package gdg.sharinglog.service.rotation.api.substitute;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
@@ -16,17 +17,22 @@ import gdg.sharinglog.domain.User;
 import gdg.sharinglog.domain.rotation.AssignmentEndReason;
 import gdg.sharinglog.domain.rotation.AssignmentTrigger;
 import gdg.sharinglog.domain.rotation.Chore;
+import gdg.sharinglog.domain.rotation.ChoreOccurrence;
 import gdg.sharinglog.domain.rotation.ChoreEligibilityMode;
+import gdg.sharinglog.domain.rotation.OccurrenceStatus;
 import gdg.sharinglog.domain.rotation.SubstituteRecipientStatus;
 import gdg.sharinglog.domain.rotation.SubstituteRequestStatus;
 import gdg.sharinglog.repository.GroupMemberRepository;
 import gdg.sharinglog.repository.SharingGroupRepository;
 import gdg.sharinglog.repository.UserRepository;
 import gdg.sharinglog.repository.rotation.ChoreAssignmentAttemptRepository;
+import gdg.sharinglog.repository.rotation.ChoreOccurrenceRepository;
 import gdg.sharinglog.repository.rotation.ChoreRepository;
 import gdg.sharinglog.repository.rotation.RotationDecisionLogRepository;
 import gdg.sharinglog.service.rotation.assignment.DirectAssignmentService;
 import gdg.sharinglog.service.rotation.occurrence.OccurrenceGenerationService;
+import gdg.sharinglog.web.rotation.error.RotationForbiddenException;
+import gdg.sharinglog.web.rotation.error.RotationProblemCode;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -62,6 +68,9 @@ class SubstituteRequestApplicationServiceTest {
 
     @Autowired
     ChoreAssignmentAttemptRepository assignmentRepository;
+
+    @Autowired
+    ChoreOccurrenceRepository occurrenceRepository;
 
     @Autowired
     RotationDecisionLogRepository decisionLogRepository;
@@ -161,6 +170,99 @@ class SubstituteRequestApplicationServiceTest {
                 recipient.getPublicId(),
                 accepted.occurrence().currentAssignee().membershipId()
         );
+    }
+
+    @Test
+    void pendingRequestBlocksAnotherMemberThenAcceptedSubstituteCanRequestAgainWithoutReplanning() {
+        List<GroupMember> members = twoMembers();
+        SharingGroup group = members.getFirst().getGroup();
+        Chore chore = choreRepository.save(Chore.daily(
+                group,
+                members.getFirst(),
+                "순번 유지 공용 청소",
+                ChoreEligibilityMode.ALL_ACTIVE_MEMBERS,
+                LocalTime.of(21, 0),
+                REFERENCE.minusSeconds(60)
+        ));
+        LocalDate activeOn = LocalDate.of(2026, 7, 23);
+        LocalDate horizonEnd = LocalDate.of(2026, 7, 27);
+        List<ChoreOccurrence> planned = generationService.ensureOccurrencesUntil(
+                chore.getId(),
+                REFERENCE,
+                horizonEnd
+        );
+        ChoreOccurrence occurrence = planned.stream()
+                .filter(item -> item.getPeriodStart().equals(activeOn))
+                .findFirst()
+                .orElseThrow();
+        List<String> futurePlanBefore = planned.stream()
+                .filter(item -> item.getPeriodStart().isAfter(activeOn))
+                .map(this::planIdentity)
+                .toList();
+        GroupMember requester = occurrence.currentAssignee().orElseThrow();
+        GroupMember substitute = members.stream()
+                .filter(member -> !member.getId().equals(requester.getId()))
+                .findFirst()
+                .orElseThrow();
+
+        var created = service.create(
+                group.getPublicId(),
+                occurrence.getPublicId(),
+                "google",
+                principal(requester),
+                occurrence.getVersion(),
+                "오늘은 어렵습니다.",
+                REFERENCE.plusSeconds(60)
+        );
+
+        RotationForbiddenException blocked = assertThrows(
+                RotationForbiddenException.class,
+                () -> service.create(
+                        group.getPublicId(),
+                        occurrence.getPublicId(),
+                        "google",
+                        principal(substitute),
+                        occurrence.getVersion(),
+                        "대타의 대타 요청",
+                        REFERENCE.plusSeconds(90)
+                )
+        );
+        assertEquals(RotationProblemCode.SUBSTITUTE_REQUESTED_BY_ANOTHER_MEMBER,
+                blocked.problem());
+        assertEquals("다른 사용자가 올린 대타 요청입니다", blocked.getMessage());
+
+        var accepted = service.accept(
+                group.getPublicId(),
+                created.requestId(),
+                "google",
+                principal(substitute),
+                created.version(),
+                REFERENCE.plusSeconds(120)
+        );
+        var repeated = service.create(
+                group.getPublicId(),
+                occurrence.getPublicId(),
+                "google",
+                principal(substitute),
+                accepted.occurrence().version(),
+                "수락했지만 다시 대타가 필요합니다.",
+                REFERENCE.plusSeconds(180)
+        );
+
+        assertEquals(SubstituteRequestStatus.PENDING, repeated.status());
+        assertEquals(substitute.getPublicId(), repeated.requester().membershipId());
+        List<String> futurePlanAfter = occurrenceRepository
+                .findAllByChore_Group_IdAndPeriodStartBetweenOrderByPeriodStartAscIdAsc(
+                        group.getId(),
+                        activeOn.plusDays(1),
+                        horizonEnd.minusDays(1)
+                )
+                .stream()
+                .filter(item -> item.getChore().getId().equals(chore.getId()))
+                .filter(item -> item.getStatus() != OccurrenceStatus.CANCELLED)
+                .map(this::planIdentity)
+                .toList();
+        assertEquals(futurePlanBefore, futurePlanAfter);
     }
 
     @Test
@@ -271,6 +373,24 @@ class SubstituteRequestApplicationServiceTest {
                 memberRepository.save(GroupMember.member(group, first)),
                 memberRepository.save(GroupMember.member(group, second))
         );
+    }
+
+    private List<GroupMember> twoMembers() {
+        User owner = userRepository.save(user("substitute-two-owner"));
+        User member = userRepository.save(user("substitute-two-member"));
+        SharingGroup group = groupRepository.save(new SharingGroup("둘이 사는 집", owner));
+        return List.of(
+                memberRepository.save(GroupMember.owner(group, owner)),
+                memberRepository.save(GroupMember.member(group, member))
+        );
+    }
+
+    private String planIdentity(ChoreOccurrence occurrence) {
+        return occurrence.getPeriodStart()
+                + ":" + occurrence.getPublicId()
+                + ":" + occurrence.currentAssignee()
+                .map(GroupMember::getPublicId)
+                .orElse("UNASSIGNED");
     }
 
     private OAuth2User principal(GroupMember member) {

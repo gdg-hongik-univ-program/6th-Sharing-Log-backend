@@ -14,6 +14,10 @@ import org.springframework.data.repository.query.Param;
 
 public interface SubstituteRequestRepository extends JpaRepository<SubstituteRequest, Long> {
 
+    @EntityGraph(attributePaths = {
+            "requesterAssignment",
+            "requesterAssignment.assignee"
+    })
     Optional<SubstituteRequest> findByOccurrence_IdAndActiveMarker(
             Long occurrenceId,
             Integer activeMarker

@@ -14,6 +14,9 @@ public enum AssignmentEndReason {
     public static final List<AssignmentEndReason> SAME_OCCURRENCE_EXCLUSIONS =
             List.of(DECLINED_BY_ASSIGNEE, SUBSTITUTE_ACCEPTED);
 
+    public static final List<AssignmentEndReason> SUBSTITUTE_REQUEST_RECIPIENT_EXCLUSIONS =
+            List.of(DECLINED_BY_ASSIGNEE);
+
     public boolean requiresReassignment() {
         return this == DECLINED_BY_ASSIGNEE
                 || this == ASSIGNEE_LEFT_GROUP

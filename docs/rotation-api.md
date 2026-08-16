@@ -246,6 +246,7 @@ API는 사용자 계정 ID나 이메일 대신 그룹 멤버십의 공개 UUID�
   },
   "lastAssignee": null,
   "attention": null,
+  "substituteRequestNotice": "다른 사용자가 올린 대타 요청입니다",
   "availableActions": [],
   "closedAt": null,
   "version": 4
@@ -256,6 +257,7 @@ API는 사용자 계정 ID나 이메일 대신 그룹 멤버십의 공개 UUID�
 - `NEEDS_ATTENTION`: `currentAssignee`가 없고 `attention`이 반드시 있다.
 - `COMPLETED`, `SKIPPED`: `currentAssignee`가 없고 `lastAssignee`와 `closedAt`이 있다.
 - 재배정 실패로 `NEEDS_ATTENTION`이 된 경우 `lastAssignee`에는 직전에 종료된 담당자가 있을 수 있다. 이는 현재 담당자가 아니다.
+- 다른 멤버가 이 회차에 진행 중인 대타 요청을 올렸으면 `substituteRequestNotice`는 `다른 사용자가 올린 대타 요청입니다`이고, 그 외에는 `null`이다.
 - `availableActions`는 로그인한 요청자 기준이다. 현재 담당자에게는 `COMPLETE`와 진행 중 요청이 없을 때 `REQUEST_SUBSTITUTE`가 포함된다. 마지막 유효 완료자에게는 `UNDO_COMPLETE`, 관리자에게는 필요한 경우 `RETRY_ASSIGNMENT`가 포함된다.
 
 관리 필요 정보의 형식은 다음과 같다.
@@ -439,7 +441,11 @@ API는 사용자 계정 ID나 이메일 대신 그룹 멤버십의 공개 UUID�
 | `PATCH` | `/api/groups/{groupId}/chores/{choreId}` | 업무명·주기·마감일·가능 멤버 수정 | `200` |
 | `DELETE` | `/api/groups/{groupId}/chores/{choreId}` | 업무 비활성화 | `204` |
 | `GET` | `/api/groups/{groupId}/occurrences` | 주기·기간·상태별 회차 목록 | `200` |
+| `GET` | `/api/groups/{groupId}/occurrences/due-soon` | 개인 설정 범위 안의 내 마감 임박 회차 | `200` |
 | `GET` | `/api/groups/{groupId}/occurrences/completed-history` | 전체 또는 내 완료 업무 이력 | `200` |
+| `GET` | `/api/groups/{groupId}/notifications/summary` | 마감 임박·받은 대타 요청 개수 | `200` |
+| `GET` | `/api/groups/{groupId}/notifications/settings` | 내 주기별 마감 임박 설정 | `200` |
+| `PUT` | `/api/groups/{groupId}/notifications/settings` | 내 주기별 마감 임박 설정 변경 | `200` |
 | `POST` | `/api/groups/{groupId}/occurrences/{occurrenceId}/complete` | 실제 완료 | `200` |
 | `POST` | `/api/groups/{groupId}/occurrences/{occurrenceId}/undo-complete` | 완료 취소 및 같은 멤버로 복원 | `200` |
 | `POST` | `/api/groups/{groupId}/occurrences/{occurrenceId}/substitute-requests` | 대타 요청 생성 | `201` |
@@ -732,6 +738,45 @@ GET /api/groups/{groupId}/occurrences/{occurrenceId}
 
 성공 시 `200`, 3.4의 상세 표현과 `ETag`를 반환한다. 현재 담당자가 없어도 과거 담당자를 `currentAssignee`로 채우지 않는다.
 
+### 6.4 마감 임박 조회와 개인 알림 설정
+
+설정은 그룹 전체가 아니라 로그인한 그룹 멤버 개인에게 저장된다. 기존 멤버와 새 멤버의 기본값은 모든 주기에서 마감 5시간 전이다.
+
+```http
+GET /api/groups/{groupId}/notifications/settings
+```
+
+```json
+{
+  "groupId": "11111111-1111-4111-8111-111111111111",
+  "membershipId": "55555555-5555-4555-8555-555555555555",
+  "dailyHoursBeforeDue": 5,
+  "weeklyHoursBeforeDue": 5,
+  "biweeklyHoursBeforeDue": 5
+}
+```
+
+```http
+PUT /api/groups/{groupId}/notifications/settings
+Content-Type: application/json
+```
+
+```json
+{
+  "dailyHoursBeforeDue": 4,
+  "weeklyHoursBeforeDue": 48,
+  "biweeklyHoursBeforeDue": 240
+}
+```
+
+- `dailyHoursBeforeDue`: 1~24
+- `weeklyHoursBeforeDue`: 1~168
+- `biweeklyHoursBeforeDue`: 1~336
+
+`GET /api/groups/{groupId}/occurrences/due-soon`은 현재 멤버에게 배정된 `ASSIGNED` 회차 중 `현재 시각 <= dueAt <= 현재 시각 + 해당 주기 설정`인 항목만 반환한다. 설정 범위 안이면 미리 생성된 미래 회차도 포함하고, 마감이 지난 회차는 제외한다. `/notifications/summary`의 마감 임박 개수도 같은 조회 결과를 사용한다.
+
+이 API는 알림 조회 범위와 개인 설정을 제공한다. 푸시, 이메일, SSE, WebSocket 같은 발송 채널은 별도 기능이다.
+
 ## 7. 담당자 행동 API
 
 모든 행동은 `ASSIGNED` 회차의 현재 담당자만 호출할 수 있다.
@@ -831,9 +876,10 @@ If-Match: "{occurrenceVersion}"
 ```
 
 - 사유는 공백 제거 후 1~500자이며 현재 담당자만 생성할 수 있다.
-- 회차 가능 멤버 스냅샷 중 현재 활성 세대의 활성 멤버에게 요청한다. 요청자와 같은 회차의 수행 불가·대타 이전 제외 멤버는 뺀다.
+- 회차 가능 멤버 스냅샷 중 현재 활성 세대의 활성 멤버에게 요청한다. 요청자와 같은 회차의 레거시 수행 불가 멤버는 빼지만, 과거 대타 수락으로 담당에서 빠진 멤버는 다음 대타 요청의 수신자로 다시 포함할 수 있다.
 - 요청 중에도 원 담당자와 회차의 `ASSIGNED` 상태는 유지된다.
 - 같은 활성 배정에는 진행 중 요청 하나만 허용한다.
+- 다른 멤버의 진행 중 요청이 있는 회차에 새 요청을 만들면 `403 SUBSTITUTE_REQUESTED_BY_ANOTHER_MEMBER`와 `다른 사용자가 올린 대타 요청입니다`를 반환한다.
 - 수신자가 없으면 `409 NO_SUBSTITUTE_CANDIDATE`다.
 - 성공은 `201`, 요청 URI를 담은 `Location`, 요청 버전 `ETag`를 반환한다.
 
@@ -858,7 +904,7 @@ If-Match: "{requestVersion}"
 - 첫 유효 수락자가 담당자가 된다. 원 배정은 `SUBSTITUTE_ACCEPTED`, 새 직접 배정은 `SUBSTITUTE_ACCEPTANCE`로 기록하고 다른 수신자는 `INELIGIBLE`이 된다.
 - 거절은 해당 수신자만 `DECLINED`로 바꾼다. 응답 가능한 수신자가 없으면 요청은 `EXHAUSTED`가 되지만 원 담당자는 유지된다.
 - 완료·현재 담당자의 탈퇴 또는 참여 제외 시 진행 중 요청은 `CANCELLED`가 된다. 일반 수신자의 탈퇴·참여 제외는 해당 수신자만 `INELIGIBLE`로 바꾼다.
-- 대타 수락은 공정 랜덤 재실행이 아니라 사용자의 명시적 수락에 따른 직접 배정이다.
+- 대타 수락은 공정 랜덤 재실행이 아니라 사용자의 명시적 수락에 따른 직접 배정이다. 같은 회차의 현재 담당자만 수락자로 교체하며 이미 생성된 다른 회차와 로테이션 계획은 변경하지 않는다.
 
 ## 8. `NEEDS_ATTENTION` 재시도
 
@@ -1052,7 +1098,7 @@ ETag: "3"
 | `204` | - | 업무 비활성화 성공 |
 | `400` | `VALIDATION_FAILED`, `INVALID_QUERY` | 본문, enum, 날짜 범위, UUID 형식 오류 |
 | `401` | `UNAUTHENTICATED` | 로그인 필요 |
-| `403` | `FORBIDDEN`, `NOT_CURRENT_ASSIGNEE`, `NOT_SUBSTITUTE_RECIPIENT` | 역할·담당자·대타 수신자 권한 부족 |
+| `403` | `FORBIDDEN`, `NOT_CURRENT_ASSIGNEE`, `NOT_SUBSTITUTE_RECIPIENT`, `SUBSTITUTE_REQUESTED_BY_ANOTHER_MEMBER` | 역할·담당자·대타 수신자 권한 부족 또는 다른 멤버의 진행 중 대타 요청 |
 | `404` | `RESOURCE_NOT_FOUND` | 그룹에 속한 리소스를 찾을 수 없음 |
 | `409` | `VERSION_CONFLICT` | `If-Match` 버전이 현재 버전과 다름 |
 | `409` | `CHORE_VERSION_CONFLICT` | 재시도에 지정한 현재 업무 버전이 다름 |
