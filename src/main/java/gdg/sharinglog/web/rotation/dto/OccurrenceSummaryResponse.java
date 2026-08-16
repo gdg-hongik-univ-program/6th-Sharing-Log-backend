@@ -20,6 +20,7 @@ public record OccurrenceSummaryResponse(
         MemberRefResponse currentAssignee,
         MemberRefResponse lastAssignee,
         AttentionResponse attention,
+        String substituteRequestNotice,
         List<AvailableAction> availableActions,
         Instant closedAt,
         long version

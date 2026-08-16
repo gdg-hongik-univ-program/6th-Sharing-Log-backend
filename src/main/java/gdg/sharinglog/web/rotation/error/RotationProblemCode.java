@@ -62,6 +62,11 @@ public enum RotationProblemCode {
             "이미 진행 중인 대타 요청이 있습니다.",
             "기존 대타 요청의 응답 상태를 확인해 주세요."
     ),
+    SUBSTITUTE_REQUESTED_BY_ANOTHER_MEMBER(
+            HttpStatus.FORBIDDEN,
+            "다른 사용자가 올린 대타 요청입니다",
+            "다른 사용자가 올린 대타 요청입니다"
+    ),
     NO_SUBSTITUTE_CANDIDATE(
             HttpStatus.CONFLICT,
             "대타 요청을 받을 수 있는 멤버가 없습니다.",

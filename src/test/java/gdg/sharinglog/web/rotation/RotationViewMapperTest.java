@@ -12,6 +12,7 @@ import gdg.sharinglog.domain.User;
 import gdg.sharinglog.domain.rotation.Chore;
 import gdg.sharinglog.domain.rotation.ChoreOccurrence;
 import gdg.sharinglog.domain.rotation.OccurrenceStatus;
+import gdg.sharinglog.domain.rotation.SubstituteRequest;
 import gdg.sharinglog.repository.rotation.ChoreAssignmentAttemptRepository;
 import gdg.sharinglog.repository.rotation.SubstituteRequestRepository;
 import gdg.sharinglog.service.rotation.access.RotationActor;
@@ -98,6 +99,37 @@ class RotationViewMapperTest {
                 List.of(OccurrenceSummaryResponse.AvailableAction.REQUEST_SUBSTITUTE),
                 response.availableActions()
         );
+    }
+
+    @Test
+    void pendingRequestFromAnotherMemberShowsNoticeAndNoRequestAction() {
+        ChoreOccurrence occurrence = org.mockito.Mockito.mock(ChoreOccurrence.class);
+        Chore chore = org.mockito.Mockito.mock(Chore.class);
+        SharingGroup group = org.mockito.Mockito.mock(SharingGroup.class);
+        GroupMember actorMembership = org.mockito.Mockito.mock(GroupMember.class);
+        GroupMember requester = org.mockito.Mockito.mock(GroupMember.class);
+        User actorUser = org.mockito.Mockito.mock(User.class);
+        User requesterUser = org.mockito.Mockito.mock(User.class);
+        SubstituteRequest request = org.mockito.Mockito.mock(SubstituteRequest.class);
+        RotationActor actor = new RotationActor(group, actorMembership, actorUser);
+
+        when(occurrence.getId()).thenReturn(22L);
+        when(occurrence.getChore()).thenReturn(chore);
+        when(chore.getName()).thenReturn("대타 요청 중인 업무");
+        when(occurrence.getStatus()).thenReturn(OccurrenceStatus.ASSIGNED);
+        when(occurrence.currentAssignee()).thenReturn(Optional.of(requester));
+        when(actorMembership.getId()).thenReturn(10L);
+        when(requester.getId()).thenReturn(11L);
+        when(requester.getUser()).thenReturn(requesterUser);
+        when(request.requester()).thenReturn(requester);
+        when(substituteRequestRepository.findByOccurrence_IdAndActiveMarker(22L, 1))
+                .thenReturn(Optional.of(request));
+
+        OccurrenceSummaryResponse response = mapper.occurrence(occurrence, actor);
+
+        assertEquals("다른 사용자가 올린 대타 요청입니다",
+                response.substituteRequestNotice());
+        assertEquals(List.of(), response.availableActions());
     }
 
     @Test

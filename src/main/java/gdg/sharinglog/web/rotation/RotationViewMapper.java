@@ -2,11 +2,13 @@ package gdg.sharinglog.web.rotation;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import gdg.sharinglog.domain.GroupMember;
 import gdg.sharinglog.domain.User;
 import gdg.sharinglog.domain.rotation.ChoreOccurrence;
 import gdg.sharinglog.domain.rotation.OccurrenceStatus;
+import gdg.sharinglog.domain.rotation.SubstituteRequest;
 import gdg.sharinglog.repository.rotation.ChoreAssignmentAttemptRepository;
 import gdg.sharinglog.repository.rotation.SubstituteRequestRepository;
 import gdg.sharinglog.service.rotation.access.RotationActor;
@@ -68,6 +70,13 @@ public class RotationViewMapper {
             RotationActor actor,
             String choreName
     ) {
+        Optional<SubstituteRequest> activeSubstituteRequest =
+                occurrence.getStatus() == OccurrenceStatus.ASSIGNED
+                        ? substituteRequestRepository.findByOccurrence_IdAndActiveMarker(
+                                occurrence.getId(),
+                                1
+                        )
+                        : Optional.empty();
         return new OccurrenceSummaryResponse(
                 occurrence.getPublicId(),
                 occurrence.getChore().getPublicId(),
@@ -81,7 +90,8 @@ public class RotationViewMapper {
                 occurrence.currentAssignee().map(this::member).orElse(null),
                 lastAssignee(occurrence),
                 attention(occurrence),
-                availableActions(occurrence, actor),
+                substituteRequestNotice(activeSubstituteRequest, actor),
+                availableActions(occurrence, actor, activeSubstituteRequest),
                 occurrence.getClosedAt(),
                 occurrence.getVersion()
         );
@@ -132,7 +142,8 @@ public class RotationViewMapper {
 
     private List<OccurrenceSummaryResponse.AvailableAction> availableActions(
             ChoreOccurrence occurrence,
-            RotationActor actor
+            RotationActor actor,
+            Optional<SubstituteRequest> activeSubstituteRequest
     ) {
         List<OccurrenceSummaryResponse.AvailableAction> actions = new ArrayList<>();
         if (occurrence.getStatus() == OccurrenceStatus.ASSIGNED
@@ -146,9 +157,7 @@ public class RotationViewMapper {
             if (!occurrence.getPeriodStart().isAfter(activeOn)) {
                 actions.add(OccurrenceSummaryResponse.AvailableAction.COMPLETE);
             }
-            if (substituteRequestRepository
-                    .findByOccurrence_IdAndActiveMarker(occurrence.getId(), 1)
-                    .isEmpty()) {
+            if (activeSubstituteRequest.isEmpty()) {
                 actions.add(OccurrenceSummaryResponse.AvailableAction.REQUEST_SUBSTITUTE);
             }
         }
@@ -165,6 +174,17 @@ public class RotationViewMapper {
             actions.add(OccurrenceSummaryResponse.AvailableAction.UNDO_COMPLETE);
         }
         return List.copyOf(actions);
+    }
+
+    private String substituteRequestNotice(
+            Optional<SubstituteRequest> activeSubstituteRequest,
+            RotationActor actor
+    ) {
+        return activeSubstituteRequest
+                .filter(request -> !request.requester().getId()
+                        .equals(actor.membership().getId()))
+                .map(request -> "다른 사용자가 올린 대타 요청입니다")
+                .orElse(null);
     }
 
     private String firstText(String... values) {

@@ -6,8 +6,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.time.LocalDate;
 import java.time.DayOfWeek;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 
@@ -96,17 +97,22 @@ class OccurrenceQueryServiceTest {
     }
 
     @Test
-    void findDueSoonReturnsCallersAssignedOccurrencesOrderedByRepository() {
+    void findDueSoonUsesCurrentMembershipsFrequencySpecificLeadTimes() {
         String groupPublicId = "group-public-id";
+        Instant referenceTime = Instant.parse("2026-08-16T03:00:00Z");
         OAuth2User principal = mock(OAuth2User.class);
         SharingGroup group = mock(SharingGroup.class);
         GroupMember membership = mock(GroupMember.class);
         User user = mock(User.class);
         RotationActor actor = new RotationActor(group, membership, user);
-        ChoreOccurrence soonest = mock(ChoreOccurrence.class);
-        ChoreOccurrence later = mock(ChoreOccurrence.class);
-        OccurrenceSummaryResponse soonestResponse = mock(OccurrenceSummaryResponse.class);
-        OccurrenceSummaryResponse laterResponse = mock(OccurrenceSummaryResponse.class);
+        ChoreOccurrence dailyWithinFiveHours = mock(ChoreOccurrence.class);
+        ChoreOccurrence weeklyWithinTenHours = mock(ChoreOccurrence.class);
+        ChoreOccurrence biweeklyWithinTwentyHours = mock(ChoreOccurrence.class);
+        ChoreOccurrence dailyOutsideFiveHours = mock(ChoreOccurrence.class);
+        ChoreOccurrence overdueBiweekly = mock(ChoreOccurrence.class);
+        OccurrenceSummaryResponse dailyResponse = mock(OccurrenceSummaryResponse.class);
+        OccurrenceSummaryResponse weeklyResponse = mock(OccurrenceSummaryResponse.class);
+        OccurrenceSummaryResponse biweeklyResponse = mock(OccurrenceSummaryResponse.class);
 
         when(accessService.requireActiveMember(
                 groupPublicId,
@@ -118,20 +124,52 @@ class OccurrenceQueryServiceTest {
         when(group.getTimeZoneId()).thenReturn("Asia/Seoul");
         when(group.timeZone()).thenReturn(java.time.ZoneId.of("Asia/Seoul"));
         when(membership.getId()).thenReturn(2L);
-        LocalDate activeOn = LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
+        when(membership.getDailyDueSoonHours()).thenReturn(5);
+        when(membership.getWeeklyDueSoonHours()).thenReturn(10);
+        when(membership.getBiweeklyDueSoonHours()).thenReturn(20);
+        when(dailyWithinFiveHours.getFrequencySnapshot()).thenReturn(ChoreFrequency.DAILY);
+        when(dailyWithinFiveHours.getDueAt()).thenReturn(referenceTime.plusSeconds(4 * 3600));
+        when(weeklyWithinTenHours.getFrequencySnapshot()).thenReturn(ChoreFrequency.WEEKLY);
+        when(weeklyWithinTenHours.getDueAt()).thenReturn(referenceTime.plusSeconds(8 * 3600));
+        when(biweeklyWithinTwentyHours.getFrequencySnapshot())
+                .thenReturn(ChoreFrequency.BIWEEKLY);
+        when(biweeklyWithinTwentyHours.getDueAt())
+                .thenReturn(referenceTime.plusSeconds(15 * 3600));
+        when(dailyOutsideFiveHours.getFrequencySnapshot()).thenReturn(ChoreFrequency.DAILY);
+        when(dailyOutsideFiveHours.getDueAt()).thenReturn(referenceTime.plusSeconds(6 * 3600));
+        when(overdueBiweekly.getDueAt()).thenReturn(referenceTime.minusSeconds(1));
         when(occurrenceRepository
-                .findAllAssignedToMemberActiveOn(
+                .findAllAssignedToMemberDueBetween(
                         1L,
                         2L,
-                        activeOn
+                        referenceTime,
+                        referenceTime.plusSeconds(20 * 3600)
                 ))
-                .thenReturn(List.of(soonest, later));
-        when(viewMapper.occurrence(soonest, actor)).thenReturn(soonestResponse);
-        when(viewMapper.occurrence(later, actor)).thenReturn(laterResponse);
+                .thenReturn(List.of(
+                        dailyWithinFiveHours,
+                        weeklyWithinTenHours,
+                        biweeklyWithinTwentyHours,
+                        dailyOutsideFiveHours,
+                        overdueBiweekly
+                ));
+        when(viewMapper.occurrence(dailyWithinFiveHours, actor)).thenReturn(dailyResponse);
+        when(viewMapper.occurrence(weeklyWithinTenHours, actor)).thenReturn(weeklyResponse);
+        when(viewMapper.occurrence(biweeklyWithinTwentyHours, actor))
+                .thenReturn(biweeklyResponse);
 
-        var response = service.findDueSoon(groupPublicId, "google", principal);
+        var response = service.findDueSoon(
+                groupPublicId,
+                "google",
+                principal,
+                referenceTime
+        );
 
-        assertEquals(List.of(soonestResponse, laterResponse), response.items());
+        assertEquals(
+                List.of(dailyResponse, weeklyResponse, biweeklyResponse),
+                response.items()
+        );
+        verify(viewMapper, never()).occurrence(dailyOutsideFiveHours, actor);
+        verify(viewMapper, never()).occurrence(overdueBiweekly, actor);
     }
 
     @Test

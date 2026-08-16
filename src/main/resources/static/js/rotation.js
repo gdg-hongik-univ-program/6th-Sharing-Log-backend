@@ -178,6 +178,12 @@
                 attention.textContent = "자동 배정 가능한 멤버가 없어 관리가 필요합니다.";
                 card.append(attention);
             }
+            if (item.substituteRequestNotice) {
+                const substituteNotice = document.createElement("p");
+                substituteNotice.className = "attention-line";
+                substituteNotice.textContent = item.substituteRequestNotice;
+                card.append(substituteNotice);
+            }
             card.append(actions);
             return card;
         });
