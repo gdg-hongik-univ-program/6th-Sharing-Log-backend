@@ -38,8 +38,8 @@ class LegacySchemaFlywayConfigurationTest {
             Flyway flyway = flywayConfiguration.load();
             var migrationResult = flyway.migrate();
 
-            assertThat(migrationResult.migrationsExecuted).isEqualTo(12);
-            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("13");
+            assertThat(migrationResult.migrationsExecuted).isEqualTo(13);
+            assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("14");
         }
     }
 
