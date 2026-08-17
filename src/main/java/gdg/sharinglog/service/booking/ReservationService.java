@@ -124,7 +124,12 @@ public class ReservationService {
                 reservation.getPublicId(),
                 space.getPublicId(),
                 space.getName(),
-                new ReservationMemberResponse(member.getPublicId(), member.getUser().getEmail(), me),
+                new ReservationMemberResponse(
+                        member.getPublicId(),
+                        member.getUser().getEmail(),
+                        member.getUser().getNickname(),
+                        me
+                ),
                 reservation.getDate(),
                 reservation.getStartTime(),
                 reservation.getEndTime(),
