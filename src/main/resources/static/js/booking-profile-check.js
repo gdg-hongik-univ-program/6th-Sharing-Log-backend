@@ -223,7 +223,7 @@
             appendCell(row, `${reservation.startTime} ~ ${reservation.endTime}`);
             appendCell(
                 row,
-                `${reservation.member?.email || "이메일 없음"}${reservation.member?.me ? " (나)" : ""}`
+                `${reservation.member?.nickname || "닉네임 없음"}${reservation.member?.me ? " (나)" : ""}`
             );
             appendCell(row, reservation.status);
             appendCell(row, String(reservation.version));

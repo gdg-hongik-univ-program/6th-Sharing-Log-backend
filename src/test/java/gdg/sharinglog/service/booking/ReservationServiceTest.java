@@ -49,6 +49,40 @@ class ReservationServiceTest {
     ReservationService service;
 
     @Test
+    void listReservationsReturnsMemberNickname() {
+        String groupPublicId = "grp-1";
+        String spacePublicId = "space-1";
+        LocalDate date = LocalDate.of(2026, 8, 18);
+        OAuth2User principal = mock(OAuth2User.class);
+        SharingGroup group = mock(SharingGroup.class);
+        GroupMember actorMembership = mock(GroupMember.class);
+        BookingActor actor = new BookingActor(group, actorMembership);
+        Space space = mock(Space.class);
+        Reservation reservation = mock(Reservation.class);
+        GroupMember reservationMember = mock(GroupMember.class);
+        User reservationUser = mock(User.class);
+
+        when(accessService.requireActiveMember(groupPublicId, "google", principal)).thenReturn(actor);
+        when(spaceRepository.findByPublicIdAndGroup_PublicId(spacePublicId, groupPublicId))
+                .thenReturn(Optional.of(space));
+        when(space.getId()).thenReturn(1L);
+        when(reservationRepository.findAllBySpace_IdAndDateAndStatusOrderByStartTimeAsc(
+                1L, date, ReservationStatus.ACTIVE
+        )).thenReturn(List.of(reservation));
+        when(reservation.getMember()).thenReturn(reservationMember);
+        when(reservationMember.getId()).thenReturn(2L);
+        when(actorMembership.getId()).thenReturn(1L);
+        when(reservationMember.getUser()).thenReturn(reservationUser);
+        when(reservationUser.getNickname()).thenReturn("공간지킴이");
+
+        var response = service.listReservations(
+                groupPublicId, spacePublicId, date, "google", principal
+        );
+
+        assertEquals("공간지킴이", response.items().getFirst().member().nickname());
+    }
+
+    @Test
     void createReservationRejectsOverlap() {
         String groupPublicId = "grp-1";
         String spacePublicId = "space-1";
