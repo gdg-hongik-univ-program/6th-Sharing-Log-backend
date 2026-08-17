@@ -3,6 +3,9 @@ package gdg.sharinglog.service.rotation.api.substitute;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.verify;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -14,6 +17,7 @@ import gdg.sharinglog.domain.GroupMember;
 import gdg.sharinglog.domain.OAuthProvider;
 import gdg.sharinglog.domain.SharingGroup;
 import gdg.sharinglog.domain.User;
+import gdg.sharinglog.domain.push.PushSubscription;
 import gdg.sharinglog.domain.rotation.AssignmentEndReason;
 import gdg.sharinglog.domain.rotation.AssignmentTrigger;
 import gdg.sharinglog.domain.rotation.Chore;
@@ -25,10 +29,12 @@ import gdg.sharinglog.domain.rotation.SubstituteRequestStatus;
 import gdg.sharinglog.repository.GroupMemberRepository;
 import gdg.sharinglog.repository.SharingGroupRepository;
 import gdg.sharinglog.repository.UserRepository;
+import gdg.sharinglog.repository.push.PushSubscriptionRepository;
 import gdg.sharinglog.repository.rotation.ChoreAssignmentAttemptRepository;
 import gdg.sharinglog.repository.rotation.ChoreOccurrenceRepository;
 import gdg.sharinglog.repository.rotation.ChoreRepository;
 import gdg.sharinglog.repository.rotation.RotationDecisionLogRepository;
+import gdg.sharinglog.service.push.WebPushSender;
 import gdg.sharinglog.service.rotation.assignment.DirectAssignmentService;
 import gdg.sharinglog.service.rotation.occurrence.OccurrenceGenerationService;
 import gdg.sharinglog.web.rotation.error.RotationForbiddenException;
@@ -40,6 +46,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
@@ -77,6 +84,12 @@ class SubstituteRequestApplicationServiceTest {
 
     @Autowired
     EntityManager entityManager;
+
+    @Autowired
+    PushSubscriptionRepository pushSubscriptionRepository;
+
+    @MockitoBean
+    WebPushSender webPushSender;
 
     @Test
     void createdRequestAppearsInRequesterOutbox() {
@@ -116,6 +129,51 @@ class SubstituteRequestApplicationServiceTest {
         assertEquals(SubstituteRequestBox.OUTBOX, outbox.box());
         assertEquals(1, outbox.totalCount());
         assertEquals(created.requestId(), outbox.items().getFirst().requestId());
+    }
+
+    @Test
+    void creatingARequestPushesRecipientsWithSubscriptions() {
+        List<GroupMember> members = members();
+        SharingGroup group = members.getFirst().getGroup();
+        Chore chore = choreRepository.save(Chore.daily(
+                group,
+                members.getFirst(),
+                "공용 청소",
+                ChoreEligibilityMode.ALL_ACTIVE_MEMBERS,
+                LocalTime.of(21, 0),
+                REFERENCE.minusSeconds(60)
+        ));
+        var occurrence = generationService.ensureCurrentOccurrence(chore.getId(), REFERENCE);
+        entityManager.flush();
+        entityManager.refresh(occurrence);
+        GroupMember requester = occurrence.currentAssignee().orElseThrow();
+        GroupMember recipient = members.stream()
+                .filter(member -> !member.getId().equals(requester.getId()))
+                .findFirst()
+                .orElseThrow();
+        pushSubscriptionRepository.save(new PushSubscription(
+                recipient.getUser(),
+                "https://push.example.com/substitute-recipient",
+                "p256dh",
+                "auth",
+                Instant.now()
+        ));
+
+        service.create(
+                group.getPublicId(),
+                occurrence.getPublicId(),
+                "google",
+                principal(requester),
+                occurrence.getVersion(),
+                "외부 일정이 있어요.",
+                REFERENCE.plusSeconds(60)
+        );
+
+        verify(webPushSender).send(
+                argThat(subscription ->
+                        subscription.getEndpoint().equals("https://push.example.com/substitute-recipient")),
+                anyString()
+        );
     }
 
     @Test

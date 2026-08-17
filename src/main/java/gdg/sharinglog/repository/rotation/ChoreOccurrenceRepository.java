@@ -261,4 +261,42 @@ public interface ChoreOccurrenceRepository extends JpaRepository<ChoreOccurrence
             @Param("fromInclusive") Instant fromInclusive,
             @Param("toInclusive") Instant toInclusive
     );
+
+    @EntityGraph(attributePaths = {
+            "chore",
+            "currentAssignment",
+            "currentAssignment.assignee",
+            "currentAssignment.assignee.user"
+    })
+    @Query("""
+            select occurrence
+            from ChoreOccurrence occurrence
+            where occurrence.status = gdg.sharinglog.domain.rotation.OccurrenceStatus.ASSIGNED
+              and occurrence.dueSoon24hNotifiedAt is null
+              and occurrence.dueAt > :now
+              and occurrence.dueAt <= :threshold
+            """)
+    List<ChoreOccurrence> findAllNeedingDueSoon24hNotification(
+            @Param("now") Instant now,
+            @Param("threshold") Instant threshold
+    );
+
+    @EntityGraph(attributePaths = {
+            "chore",
+            "currentAssignment",
+            "currentAssignment.assignee",
+            "currentAssignment.assignee.user"
+    })
+    @Query("""
+            select occurrence
+            from ChoreOccurrence occurrence
+            where occurrence.status = gdg.sharinglog.domain.rotation.OccurrenceStatus.ASSIGNED
+              and occurrence.dueSoon3hNotifiedAt is null
+              and occurrence.dueAt > :now
+              and occurrence.dueAt <= :threshold
+            """)
+    List<ChoreOccurrence> findAllNeedingDueSoon3hNotification(
+            @Param("now") Instant now,
+            @Param("threshold") Instant threshold
+    );
 }

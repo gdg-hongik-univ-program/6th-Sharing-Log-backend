@@ -64,6 +64,10 @@ app:
   public-base-url: "${APP_PUBLIC_BASE_URL:}"
   oauth2-success-url: "${APP_OAUTH2_SUCCESS_URL:}"
   oauth2-failure-url: "${APP_OAUTH2_FAILURE_URL:}"
+  push:
+    vapid-public-key: "${APP_PUSH_VAPID_PUBLIC_KEY:}"
+    vapid-private-key: "${APP_PUSH_VAPID_PRIVATE_KEY:}"
+    vapid-subject: "${APP_PUSH_VAPID_SUBJECT:mailto:noreply@example.com}"
 
 server:
   port: ${SERVER_PORT:8080}

@@ -114,6 +114,12 @@ public class ChoreOccurrence {
     @Column(name = "closed_at")
     private Instant closedAt;
 
+    @Column(name = "due_soon_24h_notified_at")
+    private Instant dueSoon24hNotifiedAt;
+
+    @Column(name = "due_soon_3h_notified_at")
+    private Instant dueSoon3hNotifiedAt;
+
     @Version
     @Column(name = "version", nullable = false)
     private long version;
@@ -201,6 +207,14 @@ public class ChoreOccurrence {
 
     public Optional<GroupMember> currentAssignee() {
         return Optional.ofNullable(currentAssignment).map(ChoreAssignmentAttempt::getAssignee);
+    }
+
+    public void markDueSoon24hNotified(Instant notifiedAt) {
+        this.dueSoon24hNotifiedAt = Objects.requireNonNull(notifiedAt, "알림 발송 시각은 필수입니다.");
+    }
+
+    public void markDueSoon3hNotified(Instant notifiedAt) {
+        this.dueSoon3hNotifiedAt = Objects.requireNonNull(notifiedAt, "알림 발송 시각은 필수입니다.");
     }
 
     public void rescheduleToCurrentRevision(
