@@ -1,6 +1,7 @@
 package gdg.sharinglog.service.user;
 
 import gdg.sharinglog.domain.User;
+import gdg.sharinglog.web.dto.NotificationPreferencesResponse;
 import gdg.sharinglog.web.dto.UserProfileResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.core.user.OAuth2User;
@@ -28,5 +29,27 @@ public class UserProfileService {
         User user = authenticatedUserService.requireUserForUpdate(registrationId, oAuth2User);
         user.update(nickname);
         return UserProfileResponse.from(user);
+    }
+
+    @Transactional(readOnly = true)
+    public NotificationPreferencesResponse getNotificationPreferences(
+            String registrationId,
+            OAuth2User oAuth2User
+    ) {
+        User user = authenticatedUserService.requireUser(registrationId, oAuth2User);
+        return NotificationPreferencesResponse.from(user);
+    }
+
+    @Transactional
+    public NotificationPreferencesResponse updateNotificationPreferences(
+            String registrationId,
+            OAuth2User oAuth2User,
+            Boolean dueSoonEnabled,
+            Boolean choreCompletedEnabled,
+            Boolean noticeEnabled
+    ) {
+        User user = authenticatedUserService.requireUserForUpdate(registrationId, oAuth2User);
+        user.updateNotificationPreferences(dueSoonEnabled, choreCompletedEnabled, noticeEnabled);
+        return NotificationPreferencesResponse.from(user);
     }
 }

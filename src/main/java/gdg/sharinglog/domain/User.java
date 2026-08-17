@@ -44,6 +44,15 @@ public class User implements UserDetails {
     @Column(name = "nickname")
     private String nickname;
 
+    @Column(name = "due_soon_push_enabled", nullable = false)
+    private boolean dueSoonPushEnabled = true;
+
+    @Column(name = "chore_completed_push_enabled", nullable = false)
+    private boolean choreCompletedPushEnabled = true;
+
+    @Column(name = "notice_push_enabled", nullable = false)
+    private boolean noticePushEnabled = false;
+
     @Builder
     public User(OAuthProvider provider, String providerUserId, String email,
                 String password, String nickname) {
@@ -96,5 +105,21 @@ public class User implements UserDetails {
     public User updateOAuthProfile(String email) {
         this.email = email;
         return this;
+    }
+
+    public void updateNotificationPreferences(
+            Boolean dueSoonPushEnabled,
+            Boolean choreCompletedPushEnabled,
+            Boolean noticePushEnabled
+    ) {
+        if (dueSoonPushEnabled != null) {
+            this.dueSoonPushEnabled = dueSoonPushEnabled;
+        }
+        if (choreCompletedPushEnabled != null) {
+            this.choreCompletedPushEnabled = choreCompletedPushEnabled;
+        }
+        if (noticePushEnabled != null) {
+            this.noticePushEnabled = noticePushEnabled;
+        }
     }
 }
