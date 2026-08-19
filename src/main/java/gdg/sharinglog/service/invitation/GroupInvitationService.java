@@ -6,6 +6,7 @@ import java.time.Instant;
 import gdg.sharinglog.domain.GroupInvitation;
 import gdg.sharinglog.domain.GroupMember;
 import gdg.sharinglog.domain.GroupRole;
+import gdg.sharinglog.domain.MemberStatus;
 import gdg.sharinglog.domain.SharingGroup;
 import gdg.sharinglog.domain.User;
 import gdg.sharinglog.repository.GroupInvitationRepository;
@@ -15,11 +16,13 @@ import gdg.sharinglog.service.group.exception.GroupNotFoundException;
 import gdg.sharinglog.service.invitation.exception.InvitationPermissionDeniedException;
 import gdg.sharinglog.service.invitation.result.IssuedInvitation;
 import gdg.sharinglog.service.user.AuthenticatedUserService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class GroupInvitationService {
 
     private static final Duration INVITATION_VALIDITY = Duration.ofHours(24);
@@ -32,34 +35,29 @@ public class GroupInvitationService {
     private final InvitationCodeHasher codeHasher;
     private final AuthenticatedUserService authenticatedUserService;
 
-    public GroupInvitationService(SharingGroupRepository groupRepository,
-                                  GroupMemberRepository groupMemberRepository,
-                                  GroupInvitationRepository invitationRepository,
-                                  InvitationCodeGenerator codeGenerator,
-                                  InvitationCodeHasher codeHasher,
-                                  AuthenticatedUserService authenticatedUserService) {
-        this.groupRepository = groupRepository;
-        this.groupMemberRepository = groupMemberRepository;
-        this.invitationRepository = invitationRepository;
-        this.codeGenerator = codeGenerator;
-        this.codeHasher = codeHasher;
-        this.authenticatedUserService = authenticatedUserService;
-    }
-
     @Transactional
     public IssuedInvitation issue(Long groupId, String registrationId, OAuth2User oAuth2User) {
         User requester = authenticatedUserService.requireUser(registrationId, oAuth2User);
         SharingGroup group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new GroupNotFoundException(groupId));
-        GroupMember membership = groupMemberRepository
-                .findByGroup_IdAndUser_Id(groupId, requester.getId())
-                .orElseThrow(InvitationPermissionDeniedException::new);
+        requireOwner(group, requester);
+        return issue(group, requester, Instant.now());
+    }
 
-        if (membership.getRole() != GroupRole.OWNER) {
-            throw new InvitationPermissionDeniedException();
-        }
+    @Transactional
+    public IssuedInvitation reissue(
+            String groupPublicId,
+            String registrationId,
+            OAuth2User oAuth2User
+    ) {
+        User requester = authenticatedUserService.requireUser(registrationId, oAuth2User);
+        SharingGroup group = groupRepository.findByPublicIdForUpdate(groupPublicId)
+                .orElseThrow(() -> new GroupNotFoundException(groupPublicId));
+        requireOwner(group, requester);
+        return issue(group, requester, Instant.now());
+    }
 
-        Instant createdAt = Instant.now();
+    private IssuedInvitation issue(SharingGroup group, User requester, Instant createdAt) {
         String code = nextUniqueCode();
         GroupInvitation invitation = invitationRepository.save(new GroupInvitation(
                 group,
@@ -76,6 +74,20 @@ public class GroupInvitationService {
                 invitation.getCreatedAt(),
                 invitation.getExpiresAt()
         );
+    }
+
+    private void requireOwner(SharingGroup group, User requester) {
+        GroupMember membership = groupMemberRepository
+                .findByGroup_IdAndUser_IdAndStatus(
+                        group.getId(),
+                        requester.getId(),
+                        MemberStatus.ACTIVE
+                )
+                .orElseThrow(InvitationPermissionDeniedException::new);
+
+        if (membership.getRole() != GroupRole.OWNER) {
+            throw new InvitationPermissionDeniedException();
+        }
     }
 
     private String nextUniqueCode() {

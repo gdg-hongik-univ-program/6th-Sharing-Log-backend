@@ -1,5 +1,6 @@
 package gdg.sharinglog.repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import gdg.sharinglog.domain.GroupInvitation;
@@ -10,4 +11,6 @@ public interface GroupInvitationRepository extends JpaRepository<GroupInvitation
     boolean existsByCodeHash(String codeHash);
 
     Optional<GroupInvitation> findByCodeHash(String codeHash);
+
+    List<GroupInvitation> findAllByGroup_Id(Long groupId);
 }

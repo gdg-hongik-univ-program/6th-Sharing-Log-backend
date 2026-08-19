@@ -17,7 +17,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.util.StringUtils;
 
-@RequestMapping("/api/groups/{groupId}/invitations")
+@RequestMapping("/api/groups")
 @RestController
 public class GroupInvitationController {
 
@@ -30,7 +30,7 @@ public class GroupInvitationController {
         this.publicBaseUrl = publicBaseUrl;
     }
 
-    @PostMapping
+    @PostMapping("/{groupId}/invitations")
     public ResponseEntity<InvitationResponse> issueInvitation(
             @PathVariable Long groupId,
             OAuth2AuthenticationToken authentication) {
@@ -39,6 +39,22 @@ public class GroupInvitationController {
                 authentication.getAuthorizedClientRegistrationId(),
                 authentication.getPrincipal()
         );
+        return createdResponse(invitation);
+    }
+
+    @PostMapping("/{groupPublicId}/invitations/reissue")
+    public ResponseEntity<InvitationResponse> reissueInvitation(
+            @PathVariable String groupPublicId,
+            OAuth2AuthenticationToken authentication) {
+        IssuedInvitation invitation = invitationService.reissue(
+                groupPublicId,
+                authentication.getAuthorizedClientRegistrationId(),
+                authentication.getPrincipal()
+        );
+        return createdResponse(invitation);
+    }
+
+    private ResponseEntity<InvitationResponse> createdResponse(IssuedInvitation invitation) {
         String inviteUrl = buildInviteUrl(invitation.code());
         InvitationResponse response = InvitationResponse.from(invitation, inviteUrl);
 
