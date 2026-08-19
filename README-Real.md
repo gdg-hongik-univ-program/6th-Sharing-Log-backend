@@ -46,7 +46,7 @@ SERVER_PORT = 5000
 SESSION_COOKIE_SAME_SITE = none
 SESSION_COOKIE_SECURE = true
 
-상대방 프론트는 API 요청에 credentials: "include"를 사용해야 합니다.
+프론트는 API 요청에 credentials: "include"를 사용해야 합니다.
 ------------------------------------------------------------------------------------
 백엔드에서 한 것 / 확인할 것
 EB 공개 백엔드를 HTTPS로 열었습니다.
