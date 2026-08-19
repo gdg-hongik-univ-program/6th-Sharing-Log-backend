@@ -2,11 +2,13 @@ package gdg.sharinglog.service.push;
 
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
+import java.security.Security;
 
 import gdg.sharinglog.domain.push.PushSubscription;
 import lombok.extern.slf4j.Slf4j;
 import nl.martijndwars.webpush.Notification;
 import nl.martijndwars.webpush.PushService;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -28,15 +30,16 @@ public class WebPushSender {
         this.vapidPublicKey = vapidPublicKey;
         this.vapidPrivateKey = vapidPrivateKey;
         this.vapidSubject = vapidSubject;
+        registerBouncyCastleProvider();
     }
 
     public void send(PushSubscription subscription, String payload) {
-        PushService service = resolvePushService();
-        if (service == null) {
-            log.warn("VAPID 키가 설정되지 않아 푸시를 보내지 않습니다.");
-            return;
-        }
         try {
+            PushService service = resolvePushService();
+            if (service == null) {
+                log.warn("VAPID 키가 설정되지 않아 푸시를 보내지 않습니다.");
+                return;
+            }
             Notification notification = new Notification(
                     subscription.getEndpoint(),
                     subscription.getP256dh(),
@@ -69,5 +72,11 @@ public class WebPushSender {
             }
         }
         return service;
+    }
+
+    private void registerBouncyCastleProvider() {
+        if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
+            Security.addProvider(new BouncyCastleProvider());
+        }
     }
 }
